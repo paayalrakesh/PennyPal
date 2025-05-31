@@ -5,16 +5,22 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.room.Room
 import com.fake.pennypal.data.local.PennyPalDatabase
@@ -42,73 +48,100 @@ fun AddExpenseScreen(navController: NavController) {
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        photoUri = uri
-    }
+    ) { uri: Uri? -> photoUri = uri }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFEFF7F1)),
-        contentAlignment = Alignment.Center
-    ) {
+    Scaffold(
+        bottomBar = {
+            BottomAppBar(
+                containerColor = Color(0xFFFFEB3B),
+                contentColor = Color.Black
+            ) {
+                IconButton(onClick = { navController.navigate("home") }) {
+                    Icon(Icons.Default.Home, contentDescription = "Home")
+                }
+                IconButton(onClick = { navController.navigate("manageCategories") }) {
+                    Icon(Icons.Default.List, contentDescription = "Categories")
+                }
+                IconButton(onClick = { navController.navigate("addExpense") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Expense")
+                }
+                IconButton(onClick = { navController.navigate("profile") }) {
+                    Icon(Icons.Default.Person, contentDescription = "Profile")
+                }
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
+                .padding(padding)
+                .fillMaxSize()
+                .background(Color(0xFFF1F8E9))
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Add New Expense", style = MaterialTheme.typography.headlineSmall, color = Color(0xFF388E3C))
+            Text(
+                text = "Add New Expense",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF388E3C)
+            )
             Spacer(modifier = Modifier.height(16.dp))
 
             // Date Picker
-            Button(onClick = {
-                val calendar = Calendar.getInstance()
-                DatePickerDialog(context, { _, year, month, day ->
-                    date = "$year-${month + 1}-$day"
-                }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
-            }) {
-                Text(if (date.isEmpty()) "Select Date" else "Date: $date")
+            Button(
+                onClick = {
+                    val calendar = Calendar.getInstance()
+                    DatePickerDialog(context, { _, year, month, day ->
+                        date = "$year-${month + 1}-$day"
+                    }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (date.isEmpty()) "Select Date" else "Date: $date", color = Color.Black)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Amount Input (modified)
             OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it },
                 label = { Text("Amount") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
+            Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Category Input
             OutlinedTextField(
                 value = category,
                 onValueChange = { category = it },
                 label = { Text("Category") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Description Input
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
                 label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Photo Picker
-            Button(onClick = { galleryLauncher.launch("image/*") }) {
-                Text(if (photoUri == null) "Add Photo" else "Photo Added")
+            Button(
+                onClick = { galleryLauncher.launch("image/*") },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (photoUri == null) "Add Photo" else "Photo Added", color = Color.Black)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Save Button
             Button(
                 onClick = {
                     if (date.isNotEmpty() && amount.isNotEmpty() && category.isNotEmpty()) {
@@ -122,14 +155,15 @@ fun AddExpenseScreen(navController: NavController) {
                                     photoUri = photoUri?.toString()
                                 )
                             )
-                            navController.popBackStack() // Go back to HomeScreen
+                            navController.popBackStack() // Back to home
                         }
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Save Expense", color = Color.Black)
+                Text("Save Expense", color = Color.White)
             }
         }
     }

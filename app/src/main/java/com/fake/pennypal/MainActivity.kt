@@ -16,6 +16,8 @@ import com.fake.pennypal.home.HomeScreen
 import com.fake.pennypal.auth.SignUpScreen
 import com.fake.pennypal.home.AddExpenseScreen
 import com.fake.pennypal.home.ManageCategoriesScreen
+import com.fake.pennypal.home.CategoryExpensesScreen
+import com.fake.pennypal.home.ProfileScreen
 import com.fake.pennypal.ui.theme.PennyPalTheme
 
 class MainActivity : ComponentActivity() {
@@ -38,6 +40,12 @@ class MainActivity : ComponentActivity() {
                         composable("home") { HomeScreen(navController) }
                         composable("addExpense") { AddExpenseScreen(navController) }
                         composable("manageCategories") { ManageCategoriesScreen(navController) }
+                        composable("categoryExpenses/{categoryName}") { backStackEntry ->
+                            val categoryName = backStackEntry.arguments?.getString("categoryName") ?: ""
+                            CategoryExpensesScreen(navController, categoryName)
+                        }
+                        composable("profile") {ProfileScreen(navController)}
+
 
 
                         // Add more composable routes here (home, categories, etc.)

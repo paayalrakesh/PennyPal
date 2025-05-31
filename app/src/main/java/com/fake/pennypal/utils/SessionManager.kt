@@ -1,12 +1,14 @@
 package com.fake.pennypal.utils
 
+
 import android.content.Context
+import android.content.SharedPreferences
 
 class SessionManager(context: Context) {
-    private val prefs = context.getSharedPreferences("penny_pal_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences("session_prefs", Context.MODE_PRIVATE)
 
-    fun setLoggedIn(loggedIn: Boolean) {
-        prefs.edit().putBoolean("isLoggedIn", loggedIn).apply()
+    fun setLoggedIn(isLoggedIn: Boolean) {
+        prefs.edit().putBoolean("isLoggedIn", isLoggedIn).apply()
     }
 
     fun isLoggedIn(): Boolean {
