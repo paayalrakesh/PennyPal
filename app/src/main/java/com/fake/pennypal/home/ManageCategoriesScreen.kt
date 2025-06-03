@@ -57,8 +57,8 @@ fun ManageCategoriesScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
                 }
-                IconButton(onClick = { navController.navigate("addExpense") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Expense")
+                IconButton(onClick = { navController.navigate("addChoice") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
                 }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")

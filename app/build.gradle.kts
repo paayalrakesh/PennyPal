@@ -1,8 +1,11 @@
 plugins {
+
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
+    id("com.google.gms.google-services")
+
 }
 
 android {
@@ -11,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.fake.pennypal"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -28,9 +31,12 @@ android {
             )
         }
     }
+
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "11"
@@ -48,6 +54,11 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.ui:ui-text")
     implementation("androidx.compose.foundation:foundation:1.6.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

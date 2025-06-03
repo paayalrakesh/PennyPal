@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.room.Room
+import com.google.firebase.firestore.FirebaseFirestore
 import com.fake.pennypal.data.local.PennyPalDatabase
 import com.fake.pennypal.data.local.entities.Expense
 import kotlinx.coroutines.launch
@@ -62,8 +63,8 @@ fun AddExpenseScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
                 }
-                IconButton(onClick = { navController.navigate("addExpense") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Expense")
+                IconButton(onClick = { navController.navigate("addChoice") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
                 }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")
@@ -146,15 +147,27 @@ fun AddExpenseScreen(navController: NavController) {
                 onClick = {
                     if (date.isNotEmpty() && amount.isNotEmpty() && category.isNotEmpty()) {
                         coroutineScope.launch {
-                            expenseDao.insertExpense(
-                                Expense(
-                                    date = date,
-                                    amount = amount.toDoubleOrNull() ?: 0.0,
-                                    category = category,
-                                    description = description,
-                                    photoUri = photoUri?.toString()
-                                )
+                            val expense = Expense(
+                                date = date,
+                                amount = amount.toDoubleOrNull() ?: 0.0,
+                                category = category,
+                                description = description,
+                                photoUri = photoUri?.toString()
                             )
+
+                            expenseDao.insertExpense(expense) // Keep local saving
+
+// 🔥 Save to Firestore too
+                            val db = FirebaseFirestore.getInstance()
+                            val firebaseExpense = hashMapOf(
+                                "date" to expense.date,
+                                "amount" to expense.amount,
+                                "category" to expense.category,
+                                "description" to expense.description,
+                                "photoUri" to (expense.photoUri ?: "")
+                            )
+                            db.collection("expenses").add(firebaseExpense)
+
                             navController.popBackStack() // Back to home
                         }
                     }

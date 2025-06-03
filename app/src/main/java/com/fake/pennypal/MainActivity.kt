@@ -17,12 +17,33 @@ import com.fake.pennypal.auth.SignUpScreen
 import com.fake.pennypal.home.AddExpenseScreen
 import com.fake.pennypal.home.ManageCategoriesScreen
 import com.fake.pennypal.home.CategoryExpensesScreen
+import com.fake.pennypal.home.AddIncomeScreen
+import com.fake.pennypal.home.AddChoiceScreen
 import com.fake.pennypal.home.ProfileScreen
+import com.fake.pennypal.home.AnalysisScreen
 import com.fake.pennypal.ui.theme.PennyPalTheme
+import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val db = FirebaseFirestore.getInstance()
+        val testData = hashMapOf("testField" to "Hello Firebase")
+
+        db.collection("testCollection")
+            .add(testData)
+            .addOnSuccessListener { documentReference ->
+                Log.d("FirebaseTest", "DocumentSnapshot added with ID: ${documentReference.id}")
+            }
+            .addOnFailureListener { e ->
+                Log.w("FirebaseTest", "Error adding document", e)
+            }
+        // Initialize Firebase
+        FirebaseApp.initializeApp(this)
+
         enableEdgeToEdge()
         setContent {
             PennyPalTheme {
@@ -39,12 +60,14 @@ class MainActivity : ComponentActivity() {
                         composable("signup") { SignUpScreen(navController) }
                         composable("home") { HomeScreen(navController) }
                         composable("addExpense") { AddExpenseScreen(navController) }
+                        composable("addIncome") { AddIncomeScreen(navController) }
+                        composable("addChoice") { AddChoiceScreen(navController) }
                         composable("manageCategories") { ManageCategoriesScreen(navController) }
                         composable("categoryExpenses/{categoryName}") { backStackEntry ->
                             val categoryName = backStackEntry.arguments?.getString("categoryName") ?: ""
-                            CategoryExpensesScreen(navController, categoryName)
-                        }
+                            CategoryExpensesScreen(navController, categoryName) }
                         composable("profile") {ProfileScreen(navController)}
+                        composable("analysis") {AnalysisScreen() }
 
 
 

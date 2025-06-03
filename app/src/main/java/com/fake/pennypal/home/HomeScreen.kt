@@ -5,45 +5,44 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.room.Room
-import com.fake.pennypal.data.local.PennyPalDatabase
-import com.fake.pennypal.data.local.entities.Expense
-import kotlinx.coroutines.launch
+import com.fake.pennypal.data.model.Expense
+import com.fake.pennypal.data.model.Income
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Person
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun HomeScreen(navController: NavController) {
-    val context = LocalContext.current
-    val db = remember {
-        Room.databaseBuilder(
-            context,
-            PennyPalDatabase::class.java, "pennypal-db"
-        ).build()
-    }
-    val expenseDao = db.expenseDao()
-    val coroutineScope = rememberCoroutineScope()
-    var expenses by remember { mutableStateOf(listOf<Expense>()) }
+    var incomeList by remember { mutableStateOf(emptyList<Income>()) }
+    var expenseList by remember { mutableStateOf(emptyList<Expense>()) }
 
-    // Load expenses
+    // Load income and expenses from Firebase Firestore
     LaunchedEffect(Unit) {
-        coroutineScope.launch {
-            expenses = expenseDao.getExpensesInRange("0000-00-00", "9999-12-31")
-        }
+        val db = FirebaseFirestore.getInstance()
+
+        val incomes = db.collection("incomes").get().await()
+            .mapNotNull { it.toObject(Income::class.java) }
+        val expenses = db.collection("expenses").get().await()
+            .mapNotNull { it.toObject(Expense::class.java) }
+
+        incomeList = incomes
+        expenseList = expenses
     }
+
+    val totalIncome = incomeList.sumOf { it.amount }
+    val totalExpenses = expenseList.sumOf { it.amount }
+    val balance = totalIncome - totalExpenses
+    val progress = if (totalIncome > 0) (totalExpenses / totalIncome).toFloat() else 0f
 
     Scaffold(
         bottomBar = {
@@ -57,51 +56,42 @@ fun HomeScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
                 }
-                IconButton(onClick = { navController.navigate("addExpense") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Expense")
+                IconButton(onClick = { navController.navigate("addChoice") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
                 }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")
                 }
             }
         }
-    ) { innerPadding ->
+    ) { padding ->
         Column(
             modifier = Modifier
-                .padding(innerPadding)
+                .padding(padding)
                 .fillMaxSize()
                 .background(Color(0xFFF1F8E9))
                 .padding(16.dp)
         ) {
-            Text(
-                text = "Hi, Welcome Back",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF388E3C)
-            )
-            Text(
-                text = "Good Morning",
-                fontSize = 18.sp,
-                color = Color(0xFF388E3C)
-            )
+            Text("Hi, Welcome Back", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
+            Text("Good Morning", fontSize = 18.sp, color = Color(0xFF388E3C))
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Financial summary section
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Total Balance: R7,783.00", fontWeight = FontWeight.Bold)
-                    Text("Total Expenses: -R1,187.40", fontWeight = FontWeight.Bold, color = Color.Red)
+                    Text("Total Balance: R${"%.2f".format(balance)}", fontWeight = FontWeight.Bold)
+                    Text("Total Income: R${"%.2f".format(totalIncome)}", fontWeight = FontWeight.SemiBold, color = Color(0xFF2E7D32))
+                    Text("Total Expenses: -R${"%.2f".format(totalExpenses)}", fontWeight = FontWeight.SemiBold, color = Color.Red)
                     LinearProgressIndicator(
-                        progress = 0.3f, // Replace with actual progress calculation
+                        progress = progress.coerceIn(0f, 1f),
                         color = Color(0xFF388E3C),
                         trackColor = Color.LightGray,
                         modifier = Modifier.fillMaxWidth().height(8.dp)
                     )
-                    Text("30% of your expenses, looks good.", fontSize = 12.sp)
+                    Text("${(progress * 100).toInt()}% of your income spent", fontSize = 12.sp)
                 }
             }
 
@@ -110,10 +100,8 @@ fun HomeScreen(navController: NavController) {
             Text("Recent Transactions", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
 
-            LazyColumn(
-                modifier = Modifier.weight(1f)
-            ) {
-                items(expenses) { expense ->
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(expenseList) { expense ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
