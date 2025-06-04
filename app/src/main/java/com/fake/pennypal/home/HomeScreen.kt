@@ -59,6 +59,9 @@ fun HomeScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("addChoice") }) {
                     Icon(Icons.Default.Add, contentDescription = "Add")
                 }
+                IconButton(onClick = { navController.navigate("goals") }) {
+                    Icon(Icons.Default.Star, contentDescription = "Goals") // ⭐ NEW
+                }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")
                 }
@@ -73,7 +76,6 @@ fun HomeScreen(navController: NavController) {
                 .padding(16.dp)
         ) {
             Text("Hi, Welcome Back", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
-            Text("Good Morning", fontSize = 18.sp, color = Color(0xFF388E3C))
             Spacer(modifier = Modifier.height(12.dp))
 
             Card(

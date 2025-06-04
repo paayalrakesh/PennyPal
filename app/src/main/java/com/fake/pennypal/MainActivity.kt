@@ -21,6 +21,7 @@ import com.fake.pennypal.home.AddIncomeScreen
 import com.fake.pennypal.home.AddChoiceScreen
 import com.fake.pennypal.home.ProfileScreen
 import com.fake.pennypal.home.AnalysisScreen
+import com.fake.pennypal.home.GoalScreen
 import com.fake.pennypal.ui.theme.PennyPalTheme
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -68,6 +69,8 @@ class MainActivity : ComponentActivity() {
                             CategoryExpensesScreen(navController, categoryName) }
                         composable("profile") {ProfileScreen(navController)}
                         composable("analysis") {AnalysisScreen() }
+                        composable("goals") { GoalScreen(navController) }
+
 
 
 

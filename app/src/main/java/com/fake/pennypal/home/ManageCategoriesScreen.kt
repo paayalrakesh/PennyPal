@@ -14,38 +14,44 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.navigation.NavController
-import androidx.room.Room
-import com.fake.pennypal.data.local.PennyPalDatabase
-import com.fake.pennypal.data.local.entities.Category
-import com.fake.pennypal.data.local.entities.Expense
-import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.data.model.Category
+import com.fake.pennypal.data.model.Expense
+import com.fake.pennypal.data.model.Income
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun ManageCategoriesScreen(navController: NavController) {
-    val context = LocalContext.current
-    val db = remember {
-        Room.databaseBuilder(
-            context,
-            PennyPalDatabase::class.java, "pennypal-db"
-        ).build()
-    }
-    val categoryDao = db.categoryDao()
-    val expenseDao = db.expenseDao()
+    val db = FirebaseFirestore.getInstance()
     val coroutineScope = rememberCoroutineScope()
+
     var categoryName by remember { mutableStateOf("") }
     var categories by remember { mutableStateOf(listOf<Category>()) }
     var selectedExpenses by remember { mutableStateOf(listOf<Expense>()) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
 
-    // Load categories
+    var totalIncome by remember { mutableStateOf(0.0) }
+    var totalExpense by remember { mutableStateOf(0.0) }
+    val totalBalance = totalIncome - totalExpense
+
+    // Load categories and balance
     LaunchedEffect(Unit) {
-        coroutineScope.launch { categories = categoryDao.getAllCategories() }
+        coroutineScope.launch {
+            val catSnapshot = db.collection("categories").get().await()
+            categories = catSnapshot.toObjects(Category::class.java)
+
+            val incomeSnap = db.collection("incomes").get().await()
+            totalIncome = incomeSnap.toObjects(Income::class.java).sumOf { it.amount }
+
+            val expenseSnap = db.collection("expenses").get().await()
+            totalExpense = expenseSnap.toObjects(Expense::class.java).sumOf { it.amount }
+        }
     }
 
     Scaffold(
@@ -59,6 +65,9 @@ fun ManageCategoriesScreen(navController: NavController) {
                 }
                 IconButton(onClick = { navController.navigate("addChoice") }) {
                     Icon(Icons.Default.Add, contentDescription = "Add")
+                }
+                IconButton(onClick = { navController.navigate("goals") }) {
+                    Icon(Icons.Default.Star, contentDescription = "Goals") // ⭐ NEW
                 }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")
@@ -75,7 +84,13 @@ fun ManageCategoriesScreen(navController: NavController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text("Manage Categories", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
+
             Spacer(modifier = Modifier.height(12.dp))
+
+            Text("Total Balance: R${"%.2f".format(totalBalance)}", color = Color.Black, fontWeight = FontWeight.Bold)
+            Text("Income: R${"%.2f".format(totalIncome)} | Expenses: R${"%.2f".format(totalExpense)}", color = Color.Gray)
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
                 value = categoryName,
@@ -85,57 +100,65 @@ fun ManageCategoriesScreen(navController: NavController) {
                 shape = RoundedCornerShape(12.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
+
             Button(
                 onClick = {
                     if (categoryName.isNotEmpty()) {
                         coroutineScope.launch {
-                            categoryDao.insertCategory(Category(categoryName))
-                            categories = categoryDao.getAllCategories()
+                            db.collection("categories").add(Category(name = categoryName))
+                            val catSnapshot = db.collection("categories").get().await()
+                            categories = catSnapshot.toObjects(Category::class.java)
                             categoryName = ""
-
                         }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Add Category", color = Color.Black) }
+            ) {
+                Text("Add Category", color = Color.Black)
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
-            LazyVerticalGrid(columns = GridCells.Fixed(3), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 items(categories) { category ->
                     Card(
                         modifier = Modifier
-                            .aspectRatio(1f)
-                            .clickable {
-                                coroutineScope.launch {
-                                    navController.navigate("categoryExpenses/${category.name}")
-                                    selectedExpenses = expenseDao.getExpensesByCategory(category.name)
-                                    selectedCategory = category.name
-                                }
-                            },
+                            .aspectRatio(1f),
                         shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White)
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Text(category.name, fontWeight = FontWeight.Medium, color = Color(0xFF388E3C))
-                        }
-                    }
-                }
-            }
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                category.name,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF388E3C),
+                                modifier = Modifier.clickable {
+                                    navController.navigate("categoryExpenses/${category.name}")
+                                }
 
-            selectedCategory?.let {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Expenses for $it", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                selectedExpenses.forEach { expense ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White)
-                    ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text("Date: ${expense.date}")
-                            Text("Amount: R${expense.amount}")
-                            Text("Description: ${expense.description}")
+                            )
+                            IconButton(onClick = {
+                                coroutineScope.launch {
+                                    val catSnap = db.collection("categories")
+                                        .whereEqualTo("name", category.name)
+                                        .get().await()
+                                    catSnap.documents.firstOrNull()?.reference?.delete()
+                                    val catSnapshot = db.collection("categories").get().await()
+                                    categories = catSnapshot.toObjects(Category::class.java)
+                                }
+                            }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Category")
+                            }
                         }
                     }
                 }
