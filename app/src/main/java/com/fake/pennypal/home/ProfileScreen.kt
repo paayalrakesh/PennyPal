@@ -1,5 +1,7 @@
 package com.fake.pennypal.home
 
+import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,7 +28,7 @@ fun ProfileScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {
-            BottomAppBar(
+            NavigationBar(
                 containerColor = Color(0xFFFFEB3B),
                 contentColor = Color.Black
             ) {

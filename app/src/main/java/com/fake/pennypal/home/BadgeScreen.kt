@@ -44,7 +44,7 @@ fun BadgeScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text("Your Badges") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {

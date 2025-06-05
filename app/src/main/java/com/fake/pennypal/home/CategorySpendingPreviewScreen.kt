@@ -106,7 +106,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text("Spending vs Goal") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
@@ -117,7 +117,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         },
         containerColor = Color(0xFFFFFDE7),
         bottomBar = {
-            BottomAppBar(
+            NavigationBar(
                 containerColor = Color(0xFFFFEB3B),
                 contentColor = Color.Black
             ) {

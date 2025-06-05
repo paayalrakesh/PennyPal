@@ -89,7 +89,7 @@ fun AnalysisScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {
-            BottomAppBar(
+            NavigationBar(
                 containerColor = Color(0xFFFFEB3B),
                 contentColor = Color.Black
             ) {

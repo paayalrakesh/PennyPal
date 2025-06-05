@@ -56,7 +56,7 @@ fun ManageCategoriesScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {
-            BottomAppBar(containerColor = Color(0xFFFFEB3B), contentColor = Color.Black) {
+            NavigationBar(containerColor = Color(0xFFFFEB3B), contentColor = Color.Black) {
                 IconButton(onClick = { navController.navigate("home") }) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }

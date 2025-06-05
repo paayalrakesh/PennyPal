@@ -48,7 +48,7 @@ fun CategorySummaryScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text("Category Spending Summary") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {

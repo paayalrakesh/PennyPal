@@ -52,7 +52,7 @@ fun CategoryExpensesScreen(navController: NavController, categoryName: String) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text("Expenses: $categoryName") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
