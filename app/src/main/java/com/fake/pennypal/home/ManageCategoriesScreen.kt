@@ -60,8 +60,8 @@ fun ManageCategoriesScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("home") }) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
-                IconButton(onClick = { navController.navigate("analysisScreen") }) {
-                    Icon(Icons.Default.BarChart, contentDescription = "Analysis")
+                IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
+                    Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph")
                 }
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")

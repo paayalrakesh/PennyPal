@@ -100,7 +100,7 @@ fun AddExpenseScreen(navController: NavController) {
                 onClick = {
                     val calendar = Calendar.getInstance()
                     DatePickerDialog(context, { _, year, month, day ->
-                        date = "$year-${month + 1}-$day"
+                        date = String.format("%04d-%02d-%02d", year, month + 1, day)
                     }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),

@@ -22,6 +22,8 @@ import com.fake.pennypal.home.AddChoiceScreen
 import com.fake.pennypal.home.ProfileScreen
 import com.fake.pennypal.home.AnalysisScreen
 import com.fake.pennypal.home.GoalScreen
+import com.fake.pennypal.home.CategorySpendingPreviewScreen
+import com.fake.pennypal.home.CategorySummaryScreen
 import com.fake.pennypal.ui.theme.PennyPalTheme
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -72,6 +74,19 @@ class MainActivity : ComponentActivity() {
                             AnalysisScreen(navController)
                         }
                         composable("goals") { GoalScreen(navController) }
+                        composable("categorySpendingPreview") {
+                            CategorySpendingPreviewScreen(navController)
+                        }
+                        composable("categorySummary") {
+                            CategorySummaryScreen(navController)
+                        }
+                        composable("categoryExpenses/{categoryName}") { backStackEntry ->
+                            val categoryName = backStackEntry.arguments?.getString("categoryName") ?: ""
+                            CategoryExpensesScreen(navController, categoryName)
+                        }
+
+
+
 
 
 

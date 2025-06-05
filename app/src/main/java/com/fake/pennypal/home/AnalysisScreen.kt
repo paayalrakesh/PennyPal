@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -98,6 +99,20 @@ fun AnalysisScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("analysisScreen") }) {
                     Icon(Icons.Default.BarChart, contentDescription = "Analysis")
                 }
+                IconButton(onClick = { navController.navigate("categorySummary") }) {
+                    Icon(
+                        imageVector = Icons.Default.List,
+                        contentDescription = "Category Summary",
+                        tint = Color.Black
+                    )
+                }
+                IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
+                    Icon(
+                        imageVector = Icons.Default.BarChart,
+                        contentDescription = "Category Spending Graph",
+                        tint = Color.Black
+                    )
+                }
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
                 }
@@ -110,6 +125,9 @@ fun AnalysisScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")
                 }
+
+
+
             }
         }
     ) { innerPadding ->
@@ -151,8 +169,15 @@ fun AnalysisScreen(navController: NavController) {
                 contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
                 items(listOf("Daily", "Weekly", "Monthly", "Yearly")) { label ->
-                    FilterButton(label = label, selected = selectedFilter == label) {
-                        selectedFilter = label
+                    Button(
+                        onClick = { selectedFilter = label },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedFilter == label) Color(0xFFFFEB3B) else Color.LightGray
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    ) {
+                        Text(label, color = Color.Black)
                     }
                 }
             }
@@ -237,7 +262,7 @@ fun getAnalysisDateRange(filter: String): Pair<Date, Date> {
     return start.time to end
 }
 
-fun parseAnalysisDate(dateStr: String, formatter: SimpleDateFormat): Date? {
+fun parseDate(dateStr: String, formatter: SimpleDateFormat): Date? {
     return try {
         formatter.parse(dateStr)
     } catch (e: Exception) {
