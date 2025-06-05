@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
 
+import com.fake.pennypal.data.model.Badge
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.background
@@ -13,19 +14,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
 import com.google.firebase.firestore.FirebaseFirestore
+import com.fake.pennypal.utils.getCurrentUsername
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
+
 @Composable
 fun CategorySpendingPreviewScreen(navController: NavController) {
     val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
+    val username = getCurrentUsername(context)
+
+
     var selectedFilter by remember { mutableStateOf("Monthly") }
     var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
     var minGoal by remember { mutableStateOf(0.0) }
@@ -48,10 +56,51 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
 
         categoryTotals = grouped
 
+        val totalSpent = grouped.values.sum()
+
         val goals = db.collection("goals").document("default").get().await().data
         if (goals != null) {
             minGoal = (goals["minSpendingGoal"] as? Number)?.toDouble() ?: 0.0
             maxGoal = (goals["spendingLimit"] as? Number)?.toDouble() ?: 20000.0
+        }
+
+        // 🔸 AUTOMATIC BADGE REWARD SYSTEM 🔸
+        val badgeCollection = db.collection("users").document(username).collection("badges")
+
+        if (totalSpent <= maxGoal) {
+            val badge = hashMapOf(
+                "title" to "Budget Keeper",
+                "description" to "You stayed under your spending limit!",
+                "earnedDate" to formatter.format(Date())
+            )
+            badgeCollection.add(badge)
+        }
+
+        val balance = maxGoal - totalSpent
+        if (balance >= minGoal) {
+            val badge = hashMapOf(
+                "title" to "Savings Star",
+                "description" to "You saved more than your minimum goal!",
+                "earnedDate" to formatter.format(Date())
+            )
+            badgeCollection.add(badge)
+        }
+    }
+
+    val totalSpent = categoryTotals.values.sum()
+    val goalProgress = if (maxGoal > 0) (totalSpent / maxGoal).coerceIn(0.0, 1.0) else 0.0
+
+    LaunchedEffect(goalProgress) {
+        if (goalProgress < 1.0) {
+            val badge = Badge(
+                title = "Budget Master!",
+                description = "You stayed under your monthly spending goal.",
+                earnedDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            )
+            db.collection("users").document(username)
+                .collection("badges")
+                .document("badge_budget_master")
+                .set(badge)
         }
     }
 

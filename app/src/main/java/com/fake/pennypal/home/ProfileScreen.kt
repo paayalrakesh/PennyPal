@@ -78,6 +78,17 @@ fun ProfileScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
+                onClick = { navController.navigate("badgeScreen") },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text("🏅 View Achievements", color = Color.Black)
+            }
+
+            Button(
                 onClick = { showLogoutDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
                 shape = RoundedCornerShape(12.dp),
