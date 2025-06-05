@@ -1,6 +1,7 @@
 package com.fake.pennypal.home
 
 import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -43,6 +44,8 @@ fun AddExpenseScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
 
     var date by remember { mutableStateOf("") }
+    var startTime by remember { mutableStateOf("") }
+    var endTime by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -107,6 +110,38 @@ fun AddExpenseScreen(navController: NavController) {
                 Text(if (date.isEmpty()) "Select Date" else "Date: $date", color = Color.Black)
             }
 
+            // Start Time Picker
+            Button(
+                onClick = {
+                    val calendar = Calendar.getInstance()
+                    TimePickerDialog(context, { _, hour, minute ->
+                        startTime = String.format("%02d:%02d", hour, minute)
+                    }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (startTime.isEmpty()) "Select Start Time" else "Start Time: $startTime", color = Color.Black)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // End Time Picker
+            Button(
+                onClick = {
+                    val calendar = Calendar.getInstance()
+                    TimePickerDialog(context, { _, hour, minute ->
+                        endTime = String.format("%02d:%02d", hour, minute)
+                    }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (endTime.isEmpty()) "Select End Time" else "End Time: $endTime", color = Color.Black)
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
@@ -161,7 +196,7 @@ fun AddExpenseScreen(navController: NavController) {
 
                             expenseDao.insertExpense(expense) // Keep local saving
 
-// 🔥 Save to Firestore too
+                            //Save to Firestore too
                             val db = FirebaseFirestore.getInstance()
                             val firebaseExpense = hashMapOf(
                                 "date" to expense.date,

@@ -53,6 +53,9 @@ fun HomeScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("home") }) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
+                IconButton(onClick = { navController.navigate("analysisScreen") }) {
+                    Icon(Icons.Default.BarChart, contentDescription = "Analysis")
+                }
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
                 }
@@ -60,7 +63,7 @@ fun HomeScreen(navController: NavController) {
                     Icon(Icons.Default.Add, contentDescription = "Add")
                 }
                 IconButton(onClick = { navController.navigate("goals") }) {
-                    Icon(Icons.Default.Star, contentDescription = "Goals") // ⭐ NEW
+                    Icon(Icons.Default.Star, contentDescription = "Goals")
                 }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")

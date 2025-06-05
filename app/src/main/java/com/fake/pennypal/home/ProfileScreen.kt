@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +33,9 @@ fun ProfileScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("home") }) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
+                IconButton(onClick = { navController.navigate("analysisScreen") }) {
+                    Icon(Icons.Default.BarChart, contentDescription = "Analysis")
+                }
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
                 }
@@ -39,7 +43,7 @@ fun ProfileScreen(navController: NavController) {
                     Icon(Icons.Default.Add, contentDescription = "Add")
                 }
                 IconButton(onClick = { navController.navigate("goals") }) {
-                    Icon(Icons.Default.Star, contentDescription = "Goals") // ⭐ NEW
+                    Icon(Icons.Default.Star, contentDescription = "Goals")
                 }
                 IconButton(onClick = { navController.navigate("profile") }) {
                     Icon(Icons.Default.Person, contentDescription = "Profile")

@@ -68,7 +68,9 @@ class MainActivity : ComponentActivity() {
                             val categoryName = backStackEntry.arguments?.getString("categoryName") ?: ""
                             CategoryExpensesScreen(navController, categoryName) }
                         composable("profile") {ProfileScreen(navController)}
-                        composable("analysis") {AnalysisScreen() }
+                        composable("analysisScreen") {
+                            AnalysisScreen(navController)
+                        }
                         composable("goals") { GoalScreen(navController) }
 
 
