@@ -1,5 +1,6 @@
 package com.fake.pennypal.auth
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -10,44 +11,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.room.Room
-import com.fake.pennypal.data.local.PennyPalDatabase
-import com.fake.pennypal.data.repository.UserRepository
-import com.fake.pennypal.viewmodel.AuthViewModel
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import com.fake.pennypal.utils.SessionManager
-
+import com.fake.pennypal.viewmodel.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun LoginScreen(navController: NavController) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var loginSuccess by remember { mutableStateOf<Boolean?>(null) }
-    val focusManager = LocalFocusManager.current
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val viewModel: AuthViewModel = viewModel()
     val sessionManager = remember { SessionManager(context) }
 
-    // Initialize RoomDB and AuthViewModel
-    val db = remember {
-        Room.databaseBuilder(
-            context,
-            PennyPalDatabase::class.java, "pennypal-db"
-        ).build()
-    }
-    val repository = remember { UserRepository(db.userDao()) }
-    val authViewModel = remember { AuthViewModel(repository) }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
@@ -94,18 +78,17 @@ fun LoginScreen(navController: NavController) {
             Button(
                 onClick = {
                     focusManager.clearFocus()
-                    coroutineScope.launch {
-                        val success = withContext(Dispatchers.IO) {
-                            authViewModel.loginUser(username, password)
-                        }
-                        if (success) {
-                            sessionManager.setLoggedIn(true)
-                            navController.navigate("home") {
-                                popUpTo("login") { inclusive = true }
-                            }
-                        } else {
-                            loginSuccess = false
-                        }
+                    if (username.isNotBlank() && password.isNotBlank()) {
+                        viewModel.login(username, password,
+                            onSuccess = {
+                                navController.navigate("home") {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                            },
+                            onFailure = { errorMessage = it }
+                        )
+                    } else {
+                        errorMessage = "Please fill in both fields."
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
@@ -115,11 +98,9 @@ fun LoginScreen(navController: NavController) {
                 Text("Login", fontSize = 18.sp, color = Color.Black)
             }
 
-            loginSuccess?.let {
-                if (!it) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Login failed. Please check your credentials.", color = Color.Red)
-                }
+            errorMessage?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(it, color = Color.Red)
             }
 
             Spacer(modifier = Modifier.height(12.dp))

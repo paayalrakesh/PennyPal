@@ -4,35 +4,39 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
 import com.fake.pennypal.data.model.Income
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.fake.pennypal.utils.SessionManager
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
 @Composable
 fun HomeScreen(navController: NavController) {
+    val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+    val username = sessionManager.getLoggedInUser() ?: return
+
     var incomeList by remember { mutableStateOf(emptyList<Income>()) }
     var expenseList by remember { mutableStateOf(emptyList<Expense>()) }
 
-    // Load income and expenses from Firebase Firestore
     LaunchedEffect(Unit) {
         val db = FirebaseFirestore.getInstance()
-
-        val incomes = db.collection("incomes").get().await()
+        val incomes = db.collection("users").document(username).collection("incomes").get().await()
             .mapNotNull { it.toObject(Income::class.java) }
-        val expenses = db.collection("expenses").get().await()
+        val expenses = db.collection("users").document(username).collection("expenses").get().await()
             .mapNotNull { it.toObject(Expense::class.java) }
 
         incomeList = incomes

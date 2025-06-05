@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,25 +17,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import kotlinx.coroutines.delay
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
 import com.fake.pennypal.R
+import com.fake.pennypal.utils.SessionManager
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun SplashScreen(navController: NavController) {
-    // Manage visibility state of splash screen content
     var visible by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
 
-    // LaunchedEffect runs side effects on composition
     LaunchedEffect(Unit) {
-        delay(2000) // Display splash for 2 seconds
-        visible = false // Start fade o
-        navController.navigate("login") {
-            popUpTo("splash") { inclusive = true } // Remove splash from back stack
+        delay(2000)
+        visible = false
+
+        // Navigate based on login state
+        if (sessionManager.isLoggedIn()) {
+            navController.navigate("home") {
+                popUpTo("splash") { inclusive = true }
+            }
+        } else {
+            navController.navigate("login") {
+                popUpTo("splash") { inclusive = true }
+            }
         }
     }
 
-    // Composable UI layout with fade-out animation
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -43,11 +51,11 @@ fun SplashScreen(navController: NavController) {
     ) {
         AnimatedVisibility(
             visible = visible,
-            exit = fadeOut() // Animate fade out
+            exit = fadeOut()
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(
-                    painter = painterResource(id = R.drawable.ic_wallet_logo), // Replace with your logo
+                    painter = painterResource(id = R.drawable.ic_wallet_logo),
                     contentDescription = "Penny Pal Logo",
                     modifier = Modifier.size(150.dp)
                 )

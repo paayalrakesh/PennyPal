@@ -1,37 +1,60 @@
 package com.fake.pennypal.home
 
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
+import com.fake.pennypal.utils.SessionManager
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun ProfileScreen(navController: NavController) {
+    val context = LocalContext.current
+    val db = FirebaseFirestore.getInstance()
+    val sessionManager = remember { SessionManager(context) }
+
+    var fullName by remember { mutableStateOf("Unknown") }
+    var userId by remember { mutableStateOf("Unknown") }
+    var badges by remember { mutableStateOf(listOf<String>()) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    // Load user details and badges
+    LaunchedEffect(Unit) {
+        val currentUsername = sessionManager.getLoggedInUser() ?: return@LaunchedEffect
+
+        val userDoc = db.collection("users").document(currentUsername).get().await()
+        fullName = userDoc.getString("name") ?: currentUsername
+        userId = userDoc.getString("userId") ?: "Unknown"
+
+        val badgeSnapshot = db.collection("users")
+            .document(currentUsername)
+            .collection("badges")
+            .get()
+            .await()
+
+        badges = badgeSnapshot.documents.mapNotNull { it.getString("name") }
+        isLoading = false
+    }
+
 
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = Color(0xFFFFEB3B),
-                contentColor = Color.Black
-            ) {
+            NavigationBar(containerColor = Color(0xFFFFEB3B), contentColor = Color.Black) {
                 IconButton(onClick = { navController.navigate("home") }) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
@@ -61,7 +84,6 @@ fun ProfileScreen(navController: NavController) {
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // User Info (replace with real data)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -72,8 +94,40 @@ fun ProfileScreen(navController: NavController) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text("Paayal Rakesh", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    Text("ID: 0078190", fontSize = 14.sp, color = Color.Gray)
+                    Text(fullName, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text("ID: $userId", fontSize = 14.sp, color = Color.Gray)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text("Your Badges", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+
+            if (isLoading) {
+                Spacer(modifier = Modifier.height(16.dp))
+                CircularProgressIndicator()
+            } else if (badges.isEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("No badges yet.")
+            } else {
+                Spacer(modifier = Modifier.height(16.dp))
+                LazyColumn {
+                    items(badges) { badge ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF59D)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = badge,
+                                modifier = Modifier.padding(16.dp),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
 
@@ -105,6 +159,7 @@ fun ProfileScreen(navController: NavController) {
                     confirmButton = {
                         TextButton(
                             onClick = {
+                                sessionManager.logout()
                                 showLogoutDialog = false
                                 navController.navigate("login") {
                                     popUpTo("profile") { inclusive = true }

@@ -44,7 +44,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     LaunchedEffect(selectedFilter) {
         val (start, end) = getDateRange(selectedFilter)
 
-        val expenses = db.collection("expenses").get().await()
+        val expenses = db.collection("users").document(username).collection("expenses").get().await()
             .mapNotNull { it.toObject(Expense::class.java) }
             .filter {
                 val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
@@ -58,7 +58,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
 
         val totalSpent = grouped.values.sum()
 
-        val goals = db.collection("goals").document("default").get().await().data
+        val goals = db.collection("users").document(username).collection("goals").document("default").get().await().data
         if (goals != null) {
             minGoal = (goals["minSpendingGoal"] as? Number)?.toDouble() ?: 0.0
             maxGoal = (goals["spendingLimit"] as? Number)?.toDouble() ?: 20000.0

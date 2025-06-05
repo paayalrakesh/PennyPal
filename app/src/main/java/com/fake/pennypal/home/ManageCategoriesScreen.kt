@@ -22,6 +22,7 @@ import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Category
 import com.fake.pennypal.data.model.Expense
 import com.fake.pennypal.data.model.Income
+import com.fake.pennypal.utils.SessionManager
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -29,8 +30,9 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun ManageCategoriesScreen(navController: NavController) {
     val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
+    val username = SessionManager(context).getLoggedInUser() ?: return
     val coroutineScope = rememberCoroutineScope()
-
     var categoryName by remember { mutableStateOf("") }
     var categories by remember { mutableStateOf(listOf<Category>()) }
     var selectedExpenses by remember { mutableStateOf(listOf<Expense>()) }
@@ -43,13 +45,16 @@ fun ManageCategoriesScreen(navController: NavController) {
     // Load categories and balance
     LaunchedEffect(Unit) {
         coroutineScope.launch {
-            val catSnapshot = db.collection("categories").get().await()
+            val catSnapshot = db.collection("users").document(username)
+                .collection("categories").get().await()
             categories = catSnapshot.toObjects(Category::class.java)
 
-            val incomeSnap = db.collection("incomes").get().await()
+            val incomeSnap = db.collection("users").document(username)
+                .collection("incomes").get().await()
             totalIncome = incomeSnap.toObjects(Income::class.java).sumOf { it.amount }
 
-            val expenseSnap = db.collection("expenses").get().await()
+            val expenseSnap = db.collection("users").document(username)
+                .collection("expenses").get().await()
             totalExpense = expenseSnap.toObjects(Expense::class.java).sumOf { it.amount }
         }
     }
@@ -108,7 +113,8 @@ fun ManageCategoriesScreen(navController: NavController) {
                 onClick = {
                     if (categoryName.isNotEmpty()) {
                         coroutineScope.launch {
-                            db.collection("categories").add(Category(name = categoryName))
+                            db.collection("users").document(username).collection("categories")
+                                .add(Category(name = categoryName))
                             val catSnapshot = db.collection("categories").get().await()
                             categories = catSnapshot.toObjects(Category::class.java)
                             categoryName = ""

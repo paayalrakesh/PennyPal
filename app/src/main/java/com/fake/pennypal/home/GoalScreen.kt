@@ -9,15 +9,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.fake.pennypal.utils.SessionManager
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 @Composable
 fun GoalScreen(navController: NavController) {
+    val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -26,10 +30,11 @@ fun GoalScreen(navController: NavController) {
     var spendingLimit by remember { mutableStateOf("") }
     var minSpendingGoal by remember { mutableStateOf("") }
 
-    // Load existing goals
+    // ✅ Load existing user-specific goals
     LaunchedEffect(Unit) {
+        val username = SessionManager(context).getLoggedInUser() ?: return@LaunchedEffect
         try {
-            val doc = db.collection("goals").document("default").get().await()
+            val doc = db.collection("users").document(username).collection("goals").document("default").get().await()
             if (doc.exists()) {
                 incomeGoal = doc.getDouble("incomeGoal")?.toString() ?: ""
                 spendingLimit = doc.getDouble("spendingLimit")?.toString() ?: ""
@@ -50,7 +55,7 @@ fun GoalScreen(navController: NavController) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
                 IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
-                    Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph")
+                    Icon(Icons.Default.BarChart, contentDescription = "Category Spending")
                 }
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
@@ -78,6 +83,7 @@ fun GoalScreen(navController: NavController) {
             Text("Set Your Financial Goals", fontSize = 24.sp, color = Color(0xFF388E3C))
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ✅ Input fields
             OutlinedTextField(
                 value = incomeGoal,
                 onValueChange = { incomeGoal = it },
@@ -89,7 +95,7 @@ fun GoalScreen(navController: NavController) {
             OutlinedTextField(
                 value = spendingLimit,
                 onValueChange = { spendingLimit = it },
-                label = { Text("Maximum Monthly Spending Limit") },
+                label = { Text("Max Monthly Spending Limit") },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -97,11 +103,12 @@ fun GoalScreen(navController: NavController) {
             OutlinedTextField(
                 value = minSpendingGoal,
                 onValueChange = { minSpendingGoal = it },
-                label = { Text("Minimum Monthly Spending Goal (optional)") },
+                label = { Text("Min Monthly Spending Goal (optional)") },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ✅ Save Button
             Button(
                 onClick = {
                     val income = incomeGoal.toDoubleOrNull()
@@ -109,6 +116,8 @@ fun GoalScreen(navController: NavController) {
                     val minSpending = minSpendingGoal.toDoubleOrNull()
 
                     scope.launch {
+                        val username = SessionManager(context).getLoggedInUser() ?: return@launch
+
                         if (income != null && spending != null) {
                             try {
                                 val data = mutableMapOf<String, Any>(
@@ -118,13 +127,20 @@ fun GoalScreen(navController: NavController) {
                                 if (minSpending != null) {
                                     data["minSpendingGoal"] = minSpending
                                 }
-                                db.collection("goals").document("default").set(data).await()
+
+                                db.collection("users")
+                                    .document(username)
+                                    .collection("goals")
+                                    .document("default")
+                                    .set(data)
+                                    .await()
+
                                 snackbarHostState.showSnackbar("Goals saved successfully.")
                             } catch (e: Exception) {
                                 snackbarHostState.showSnackbar("Error saving goals: ${e.message}")
                             }
                         } else {
-                            snackbarHostState.showSnackbar("Please enter valid income and max spending amounts.")
+                            snackbarHostState.showSnackbar("Enter valid income and spending amounts.")
                         }
                     }
                 },
@@ -136,7 +152,8 @@ fun GoalScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            Text("Current Goals", fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            // ✅ Current goals preview
+            Text("Current Goals", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
 
             if (incomeGoal.isNotEmpty() || spendingLimit.isNotEmpty()) {

@@ -26,23 +26,26 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun BadgeScreen(navController: NavController) {
     val context = LocalContext.current
-    val username = getCurrentUsername(context)
-
+    val username = remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        username.value = getCurrentUsername(context)
+    }
 
     var badges by remember { mutableStateOf<List<Badge>>(emptyList()) }
 
     LaunchedEffect(true) {
         val db = FirebaseFirestore.getInstance()
-        val snapshot = db.collection("users")
-            .document(username)
-            .collection("badges")
-            .get()
-            .await()
+        if (username.value != null) {
+            val snapshot = db.collection("users")
+                .document(username.value!!)
+                .collection("badges")
+                .get()
+                .await()
 
-        badges = snapshot.documents.mapNotNull { it.toObject(Badge::class.java) }
+            badges = snapshot.documents.mapNotNull { it.toObject(Badge::class.java) }
+        }
     }
-
-    Scaffold(
+        Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Your Badges") },
