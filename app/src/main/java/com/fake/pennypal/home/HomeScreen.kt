@@ -54,7 +54,7 @@ fun HomeScreen(navController: NavController) {
     val totalExpenses = CurrencyConverter.convert(totalExpensesZAR, "ZAR", selectedCurrency)
     val balance = CurrencyConverter.convert(balanceZAR, "ZAR", selectedCurrency)
 
-    val progress = if (totalIncome > 0) (totalExpenses / totalIncome).toFloat() else 0f
+    val progress = if (totalIncome > 0) (totalExpenses / totalIncome).toFloat().coerceIn(0f, 1f) else 0f
 
     Scaffold(
         bottomBar = {
@@ -136,7 +136,7 @@ fun HomeScreen(navController: NavController) {
                                 Text(expense.category, fontWeight = FontWeight.Bold)
                                 Text(expense.description, fontSize = 12.sp)
                             }
-                            Text("R${expense.amount}", fontWeight = FontWeight.Bold)
+                            Text("$selectedCurrency ${"%.2f".format(convertedAmount)}", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

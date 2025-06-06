@@ -81,12 +81,15 @@ fun LoginScreen(navController: NavController) {
                     if (username.isNotBlank() && password.isNotBlank()) {
                         viewModel.login(username, password,
                             onSuccess = {
+                                sessionManager.setLoggedInUser(username) // ✅ This stores the logged-in user
+                                println("✅ SessionManager stored username: $username")
                                 navController.navigate("home") {
                                     popUpTo("login") { inclusive = true }
                                 }
                             },
                             onFailure = { errorMessage = it }
                         )
+
                     } else {
                         errorMessage = "Please fill in both fields."
                     }

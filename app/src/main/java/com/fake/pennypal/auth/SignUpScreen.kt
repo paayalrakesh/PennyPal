@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fake.pennypal.utils.SessionManager
 import androidx.navigation.NavController
 import com.fake.pennypal.viewmodel.AuthViewModel
 import java.util.* // ✅ Needed for userId generator
@@ -24,6 +25,7 @@ import java.util.* // ✅ Needed for userId generator
 fun SignUpScreen(navController: NavController) {
     val context = LocalContext.current
     val viewModel: AuthViewModel = viewModel()
+    val sessionManager = remember { SessionManager(context) }
 
     // 🟡 STATE VARIABLES
     var fullName by remember { mutableStateOf("") }
@@ -113,6 +115,7 @@ fun SignUpScreen(navController: NavController) {
                             userId = generatedUserId,
                             onSuccess = {
                                 Toast.makeText(context, "Account created", Toast.LENGTH_SHORT).show()
+                                sessionManager.setLoggedInUser(username)
                                 navController.navigate("login")
                             },
                             onFailure = { msg ->

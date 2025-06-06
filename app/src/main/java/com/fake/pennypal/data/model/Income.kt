@@ -1,8 +1,11 @@
 package com.fake.pennypal.data.model
 
+import androidx.annotation.Keep
+
+@Keep
 data class Income(
-    val id: String = "",
-    val date: String = "",
-    val amount: Double = 0.0,
-    val description: String = ""
+    var id: String = "",
+    var date: String = "",
+    var amount: Double = 0.0,
+    var description: String = ""
 )

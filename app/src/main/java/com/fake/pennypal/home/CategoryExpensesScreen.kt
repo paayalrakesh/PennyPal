@@ -33,6 +33,7 @@ import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryExpensesScreen(navController: NavController, categoryName: String) {
     val db = FirebaseFirestore.getInstance()
@@ -45,7 +46,9 @@ fun CategoryExpensesScreen(navController: NavController, categoryName: String) {
 
     LaunchedEffect(selectedFilter, categoryName) {
         val (start, end) = getDateRange(selectedFilter)
-        val allExpenses = db.collection("expenses")
+        val username = SessionManager(context).getLoggedInUser() ?: return@LaunchedEffect
+        val allExpenses = db.collection("users").document(username)
+            .collection("expenses")
             .whereEqualTo("category", categoryName)
             .get().await()
             .mapNotNull { it.toObject(Expense::class.java) }
@@ -53,7 +56,6 @@ fun CategoryExpensesScreen(navController: NavController, categoryName: String) {
                 val date = try { formatter.parse(it.date) } catch (e: Exception) { null }
                 date != null && date >= start && date <= end
             }
-        expenses = allExpenses
     }
 
     Scaffold(

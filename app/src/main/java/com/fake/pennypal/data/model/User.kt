@@ -1,7 +1,9 @@
 package com.fake.pennypal.data.model
 
+import androidx.annotation.Keep
 
+@Keep
 data class User(
-    val username: String = "",
-    val password: String = ""
+    var username: String = "",
+    var password: String = ""
 )

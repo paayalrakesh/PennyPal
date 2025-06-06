@@ -62,7 +62,7 @@ fun CurrencyDropdown(
 fun CategorySpendingPreviewScreen(navController: NavController) {
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
-    val username = getCurrentUsername(context)
+    val username = remember { SessionManager(context).getLoggedInUser() ?: "" }
     val sessionManager = remember { SessionManager(context) }
     var selectedCurrency by remember { mutableStateOf(sessionManager.getSelectedCurrency()) }
 
@@ -74,6 +74,8 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     LaunchedEffect(selectedFilter, selectedCurrency) {
+        if (username.isEmpty()) return@LaunchedEffect  // ✅ Prevent crash if no user is logged in
+
         val (start, end) = getDateRange(selectedFilter)
 
         val expenses = db.collection("users").document(username).collection("expenses").get().await()
@@ -82,6 +84,10 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
                 parsedDate != null && parsedDate in start..end
             }
+        println("🔍 Total expenses fetched: ${expenses.size}")
+        expenses.forEach {
+            println("➡️ ${it.category} | ${it.amount} | ${it.date}")
+        }
 
         val grouped = expenses.groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
@@ -91,6 +97,8 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         }
 
         categoryTotals = converted
+        println("📊 categoryTotals = $categoryTotals")
+
 
         val totalSpent = converted.values.sum()
 

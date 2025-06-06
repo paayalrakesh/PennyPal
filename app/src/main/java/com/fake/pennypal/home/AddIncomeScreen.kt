@@ -30,6 +30,8 @@ fun AddIncomeScreen(navController: NavController) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val selectedCurrency = sessionManager.getSelectedCurrency()
+    val username = remember { SessionManager(context).getLoggedInUser() }
+
 
     var date by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
@@ -112,8 +114,14 @@ fun AddIncomeScreen(navController: NavController) {
 
             Button(
                 onClick = {
-                    val username = SessionManager(context).getLoggedInUser()
-                    if (username != null && date.isNotEmpty() && amount.isNotEmpty()) {
+                    println("🔍 DEBUG: Username from SessionManager = $username")
+
+                    if (username.isNullOrBlank()) {
+                        println("❌ ERROR: No user is currently logged in!")
+                        return@Button
+                    }
+
+                    if (date.isNotEmpty() && amount.isNotEmpty()) {
                         val income = Income(
                             date = date,
                             amount = amount.toDoubleOrNull() ?: 0.0,
@@ -121,8 +129,18 @@ fun AddIncomeScreen(navController: NavController) {
                         )
 
                         val db = FirebaseFirestore.getInstance()
-                        db.collection("users").document(username).collection("incomes").add(income)
-                        navController.popBackStack()
+                        db.collection("users").document(username).collection("incomes")
+                            .add(income)
+                            .addOnSuccessListener {
+                                println("✅ Income saved: $income")
+                                navController.popBackStack()
+                            }
+                            .addOnFailureListener { e ->
+                                e.printStackTrace()
+                                println("❌ Failed to save income: ${e.localizedMessage}")
+                            }
+                    } else {
+                        println("⚠️ Incomplete fields: date=$date amount=$amount")
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
@@ -131,6 +149,8 @@ fun AddIncomeScreen(navController: NavController) {
             ) {
                 Text("Save Income", color = Color.White)
             }
+
+
         }
     }
 }

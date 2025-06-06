@@ -135,8 +135,9 @@ fun ManageCategoriesScreen(navController: NavController) {
                     if (categoryName.isNotEmpty()) {
                         coroutineScope.launch {
                             db.collection("users").document(username).collection("categories")
-                                .add(Category(name = categoryName))
-                            val catSnapshot = db.collection("users").document(username).collection("categories").get().await()
+                                .add(Category(name = categoryName, userId = username))
+                            val catSnapshot = db.collection("users").document(username)
+                                .collection("categories").get().await()
                             categories = catSnapshot.toObjects(Category::class.java)
                             categoryName = ""
                         }
@@ -184,8 +185,10 @@ fun ManageCategoriesScreen(navController: NavController) {
                                         .whereEqualTo("name", category.name)
                                         .get().await()
                                     catSnap.documents.firstOrNull()?.reference?.delete()
-                                    val catSnapshot = db.collection("categories").get().await()
+                                    val catSnapshot = db.collection("users").document(username)
+                                        .collection("categories").get().await()
                                     categories = catSnapshot.toObjects(Category::class.java)
+
                                 }
                             }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete Category")

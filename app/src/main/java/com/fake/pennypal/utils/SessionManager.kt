@@ -15,8 +15,11 @@ class SessionManager(context: Context) {
     }
 
     fun logout() {
+        val currency = getSelectedCurrency()
         prefs.edit().clear().apply()
+        setSelectedCurrency(currency) // ✅ preserve currency
     }
+
 
     fun isLoggedIn(): Boolean {
         return getLoggedInUser() != null

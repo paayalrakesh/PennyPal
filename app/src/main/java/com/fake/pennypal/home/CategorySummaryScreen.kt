@@ -27,7 +27,8 @@ import java.util.*
 @Composable
 fun CategorySummaryScreen(navController: NavController) {
     val context = LocalContext.current
-
+    val sessionManager = remember { SessionManager(context) }
+    val username = sessionManager.getLoggedInUser() ?: ""
     val db = FirebaseFirestore.getInstance()
 
 
@@ -37,7 +38,7 @@ fun CategorySummaryScreen(navController: NavController) {
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     LaunchedEffect(selectedFilter) {
-        val username = SessionManager(context).getLoggedInUser() ?: return@LaunchedEffect
+        if (username.isEmpty()) return@LaunchedEffect  // ✅ Prevent crash if not logged in
         val (start, end) = getDateRange(selectedFilter)
 
         val expenses = db.collection("users").document(username)
@@ -47,12 +48,13 @@ fun CategorySummaryScreen(navController: NavController) {
             .mapNotNull { it.toObject(Expense::class.java) }
             .filter {
                 val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
-                parsedDate != null && parsedDate >= start && parsedDate <= end
+                parsedDate != null && parsedDate in start..end
             }
 
         categoryTotals = expenses.groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
     }
+
 
 
 

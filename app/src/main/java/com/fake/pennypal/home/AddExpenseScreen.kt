@@ -38,6 +38,8 @@ fun AddExpenseScreen(navController: NavController) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val selectedCurrency = sessionManager.getSelectedCurrency()
+    //val username = remember { SessionManager(context).getLoggedInUser() }
+
 
     val db = remember {
         Room.databaseBuilder(
@@ -169,48 +171,85 @@ fun AddExpenseScreen(navController: NavController) {
                 onClick = {
                     if (date.isNotEmpty() && amount.isNotEmpty() && category.isNotEmpty()) {
                         coroutineScope.launch {
-                            val username = SessionManager(context).getLoggedInUser() ?: return@launch
-                            var downloadUrl = ""
+                            println("🔄 Starting save process...")
 
-                            photoUri?.let { uri ->
-                                try {
-                                    val imageRef = storageRef.child("users/$username/expenses/${UUID.randomUUID()}.jpg")
-                                    imageRef.putFile(uri).await()
-                                    downloadUrl = imageRef.downloadUrl.await().toString()
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
+                            val username = SessionManager(context).getLoggedInUser()
+                            println("👤 Username: $username")
+
+                            if (username.isNullOrBlank()) {
+                                println("❌ Username is null or blank")
+                                return@launch
                             }
 
-                            // ✅ Save to Room
-                            val roomExpense = RoomExpense(
-                                date = date,
-                                amount = amount.toDoubleOrNull() ?: 0.0,
-                                category = category,
-                                description = description,
-                                photoUri = downloadUrl // If your Room model includes this field
-                            )
-                            expenseDao.insertExpense(roomExpense)
+                            var downloadUrl = ""
 
-                            // ✅ Save to Firebase
-                            val firebaseExpense = FirebaseExpense(
-                                date = date,
-                                amount = amount.toDoubleOrNull() ?: 0.0,
-                                category = category,
-                                description = description,
-                                startTime = startTime,
-                                endTime = endTime,
-                                photoUrl = downloadUrl
-                            )
-                            FirebaseFirestore.getInstance()
-                                .collection("users")
-                                .document(username)
-                                .collection("expenses")
-                                .add(firebaseExpense)
+                            // Upload Photo
+                            if (photoUri != null) {
+                                try {
+                                    val imageRef = storageRef.child("users/$username/expenses/${UUID.randomUUID()}.jpg")
+                                    val uploadTask = imageRef.putFile(photoUri!!)
+                                    uploadTask.await()
+                                    downloadUrl = imageRef.downloadUrl.await().toString()
+                                    println("📸 Photo uploaded successfully: $downloadUrl")
+                                } catch (e: Exception) {
+                                    println("❌ Photo upload failed: ${e.localizedMessage}")
+                                    return@launch
+                                }
+                            } else {
+                                println("⚠️ No photo selected")
+                            }
 
+                            // Convert amount
+                            val expenseAmount = amount.toDoubleOrNull()
+                            if (expenseAmount == null) {
+                                println("❌ Invalid amount entered")
+                                return@launch
+                            }
 
-                            navController.popBackStack()
+                            // Save to Room (optional)
+                            try {
+                                val roomExpense = RoomExpense(
+                                    date = date,
+                                    amount = expenseAmount,
+                                    category = category,
+                                    description = description,
+                                    photoUri = downloadUrl
+                                )
+                                expenseDao.insertExpense(roomExpense)
+                                println("📦 Saved to Room DB: $roomExpense")
+                            } catch (e: Exception) {
+                                println("❌ Failed to save to Room: ${e.localizedMessage}")
+                            }
+
+                            // Save to Firebase
+                            try {
+                                val firebaseExpense = FirebaseExpense(
+                                    date = date,
+                                    amount = expenseAmount,
+                                    category = category,
+                                    description = description,
+                                    startTime = startTime,
+                                    endTime = endTime,
+                                    photoUrl = downloadUrl
+                                )
+                                FirebaseFirestore.getInstance()
+                                    .collection("users")
+                                    .document(username)
+                                    .collection("expenses")
+                                    .add(firebaseExpense)
+                                    .addOnSuccessListener {
+                                        println("✅ Expense saved to Firestore: $firebaseExpense")
+                                        navController.popBackStack()
+                                    }
+                                    .addOnFailureListener { e ->
+                                        println("❌ Firestore save failed: ${e.localizedMessage}")
+                                    }
+                            } catch (e: Exception) {
+                                println("❌ Error creating Firestore document: ${e.localizedMessage}")
+                            }
                         }
+                    } else {
+                        println("⚠️ Missing fields. Please complete all inputs.")
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),

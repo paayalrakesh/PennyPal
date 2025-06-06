@@ -1,8 +1,10 @@
 package com.fake.pennypal.data.model
 
+import androidx.annotation.Keep
 
+@Keep
 data class Badge(
-    val title: String = "",
-    val description: String = "",
-    val earnedDate: String = ""
+    var title: String = "",
+    var description: String = "",
+    var earnedDate: String = ""
 )

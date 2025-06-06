@@ -1,12 +1,15 @@
 package com.fake.pennypal.data.model
 
+import androidx.annotation.Keep
+
+@Keep
 data class Expense(
-    val id: String = "",
-    val date: String = "",
-    val amount: Double = 0.0,
-    val category: String = "",
-    val description: String = "",
-    val startTime: String = "",
-    val endTime: String = "",
-    val photoUrl: String? = null
+    var id: String = "",
+    var date: String = "",
+    var amount: Double = 0.0,
+    var category: String = "",
+    var description: String = "",
+    var startTime: String = "",
+    var endTime: String = "",
+    var photoUrl: String? = null
 )

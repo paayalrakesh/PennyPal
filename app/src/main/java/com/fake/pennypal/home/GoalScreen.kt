@@ -22,6 +22,9 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun GoalScreen(navController: NavController) {
     val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+    val username = sessionManager.getLoggedInUser() ?: ""
+
     val db = FirebaseFirestore.getInstance()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -32,7 +35,6 @@ fun GoalScreen(navController: NavController) {
 
     // ✅ Load existing user-specific goals
     LaunchedEffect(Unit) {
-        val username = SessionManager(context).getLoggedInUser() ?: return@LaunchedEffect
         try {
             val doc = db.collection("users").document(username).collection("goals").document("default").get().await()
             if (doc.exists()) {

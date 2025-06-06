@@ -1,6 +1,9 @@
 package com.fake.pennypal.data.model
 
+import androidx.annotation.Keep
+
+@Keep
 data class Category(
-    val name: String = "",
-    val userId: String = ""
+    var name: String = "",
+    var userId: String = ""
 )
