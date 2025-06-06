@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -12,13 +15,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
 import com.fake.pennypal.utils.SessionManager
-import androidx.compose.ui.platform.LocalContext
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
@@ -31,14 +34,14 @@ fun CategorySummaryScreen(navController: NavController) {
     val username = sessionManager.getLoggedInUser() ?: ""
     val db = FirebaseFirestore.getInstance()
 
-
     var selectedFilter by remember { mutableStateOf("Monthly") }
     var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
 
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     LaunchedEffect(selectedFilter) {
-        if (username.isEmpty()) return@LaunchedEffect  // ✅ Prevent crash if not logged in
+        if (username.isEmpty()) return@LaunchedEffect
+
         val (start, end) = getDateRange(selectedFilter)
 
         val expenses = db.collection("users").document(username)
@@ -55,9 +58,6 @@ fun CategorySummaryScreen(navController: NavController) {
             .mapValues { entry -> entry.value.sumOf { it.amount } }
     }
 
-
-
-
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -71,35 +71,38 @@ fun CategorySummaryScreen(navController: NavController) {
         },
         containerColor = Color(0xFFF1F8E9)
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            FilterRow(selected = selectedFilter, onFilterSelected = { selectedFilter = it })
-
-            Spacer(modifier = Modifier.height(16.dp))
+            item {
+                FilterRow(selected = selectedFilter, onFilterSelected = { selectedFilter = it })
+            }
 
             if (categoryTotals.isEmpty()) {
-                Text("No expenses found for this period.", color = Color.Gray)
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("No expenses found for this period.", color = Color.Gray, fontSize = 16.sp)
+                }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(categoryTotals.entries.toList()) { (category, total) ->
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            modifier = Modifier.fillMaxWidth()
+                items(categoryTotals.entries.toList()) { (category, total) ->
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(16.dp)
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(category, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                                Text("R${"%.2f".format(total)}", fontSize = 18.sp, color = Color(0xFFD32F2F))
-                            }
+                            Text(category, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                            Text("R${"%.2f".format(total)}", fontSize = 18.sp, color = Color(0xFFD32F2F))
                         }
                     }
                 }
@@ -107,3 +110,28 @@ fun CategorySummaryScreen(navController: NavController) {
         }
     }
 }
+@Composable
+fun FilterRow(selected: String, onFilterSelected: (String) -> Unit) {
+    val filters = listOf("Daily", "Weekly", "Monthly", "Yearly")
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp)
+    ) {
+        items(filters) { filter ->
+            Button(
+                onClick = { onFilterSelected(filter) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (filter == selected) Color(0xFFFFEB3B) else Color.LightGray
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.width(100.dp)
+            ) {
+                Text(filter, color = Color.Black, fontSize = 12.sp)
+            }
+        }
+    }
+}
+

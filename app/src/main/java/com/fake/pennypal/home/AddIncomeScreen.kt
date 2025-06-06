@@ -1,15 +1,15 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.fake.pennypal.home
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,10 +32,10 @@ fun AddIncomeScreen(navController: NavController) {
     val selectedCurrency = sessionManager.getSelectedCurrency()
     val username = remember { SessionManager(context).getLoggedInUser() }
 
-
     var date by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+
     Scaffold(
         bottomBar = {
             NavigationBar(
@@ -65,6 +65,7 @@ fun AddIncomeScreen(navController: NavController) {
                 .padding(padding)
                 .fillMaxSize()
                 .background(Color(0xFFFFFDE7))
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -74,6 +75,7 @@ fun AddIncomeScreen(navController: NavController) {
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF388E3C)
             )
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // Date Picker
@@ -84,9 +86,9 @@ fun AddIncomeScreen(navController: NavController) {
                         date = String.format("%04d-%02d-%02d", year, month + 1, day)
                     }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
                 },
+                modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text(if (date.isEmpty()) "Select Date" else "Date: $date", color = Color.Black)
             }
@@ -96,10 +98,11 @@ fun AddIncomeScreen(navController: NavController) {
             OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it },
-                label = { Text("Amount in $selectedCurrency") }, // 💬 Updated label
+                label = { Text("Amount in $selectedCurrency") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
+
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
@@ -143,14 +146,14 @@ fun AddIncomeScreen(navController: NavController) {
                         println("⚠️ Incomplete fields: date=$date amount=$amount")
                     }
                 },
+                modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Save Income", color = Color.White)
             }
 
-
+            Spacer(modifier = Modifier.height(80.dp)) // To avoid overlap with bottom nav
         }
     }
 }

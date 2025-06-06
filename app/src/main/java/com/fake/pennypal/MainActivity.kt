@@ -25,6 +25,11 @@ import com.fake.pennypal.home.CategorySpendingPreviewScreen
 import com.fake.pennypal.home.CategorySummaryScreen
 import com.fake.pennypal.home.BadgeScreen
 import com.fake.pennypal.ui.theme.PennyPalTheme
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.home.ExpenseDetailScreen
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import android.util.Log
@@ -84,6 +89,34 @@ class MainActivity : ComponentActivity() {
                         composable("badgeScreen") {
                             BadgeScreen(navController)
                         }
+                        composable(
+                            "expenseDetail/{date}/{amount}/{category}/{description}/{photoUrl}/{currency}",
+                            arguments = listOf(
+                                navArgument("date") { type = NavType.StringType },
+                                navArgument("category") { type = NavType.StringType },
+                                navArgument("description") { type = NavType.StringType },
+                                navArgument("amount") { type = NavType.FloatType },
+                                navArgument("photoUrl") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val date = backStackEntry.arguments?.getString("date") ?: ""
+                            val category = backStackEntry.arguments?.getString("category") ?: ""
+                            val description = backStackEntry.arguments?.getString("description") ?: ""
+                            val amount = backStackEntry.arguments?.getFloat("amount")?.toDouble() ?: 0.0
+                            val photoUrl = backStackEntry.arguments?.getString("photoUrl") ?: ""
+                            val currency = SessionManager(LocalContext.current).getSelectedCurrency()
+
+                            ExpenseDetailScreen(
+                                navController,
+                                date,
+                                category,
+                                description,
+                                amount,
+                                photoUrl,
+                                currency
+                            )
+                        }
+
 
                     }
                 }

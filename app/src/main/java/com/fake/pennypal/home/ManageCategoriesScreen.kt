@@ -1,3 +1,4 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
 
 import androidx.compose.foundation.background
@@ -6,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,7 +19,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Category
 import com.fake.pennypal.data.model.Expense
@@ -38,7 +39,6 @@ fun ManageCategoriesScreen(navController: NavController) {
     val coroutineScope = rememberCoroutineScope()
     var categoryName by remember { mutableStateOf("") }
     var categories by remember { mutableStateOf(listOf<Category>()) }
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
 
     var totalIncomeZAR by remember { mutableStateOf(0.0) }
     var totalExpenseZAR by remember { mutableStateOf(0.0) }
@@ -53,16 +53,12 @@ fun ManageCategoriesScreen(navController: NavController) {
             CurrencyConverter.convert(totalExpenseZAR, "ZAR", selectedCurrency)
         }
     }
-
     val totalBalanceConverted by remember(totalIncomeZAR, totalExpenseZAR, selectedCurrency) {
         derivedStateOf {
             CurrencyConverter.convert(totalIncomeZAR - totalExpenseZAR, "ZAR", selectedCurrency)
         }
     }
 
-
-
-    // Load categories and balance
     LaunchedEffect(Unit) {
         coroutineScope.launch {
             val catSnapshot = db.collection("users").document(username)
@@ -86,7 +82,7 @@ fun ManageCategoriesScreen(navController: NavController) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
                 IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
-                    Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph")
+                    Icon(Icons.Default.BarChart, contentDescription = "Spending Graph")
                 }
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
@@ -108,18 +104,30 @@ fun ManageCategoriesScreen(navController: NavController) {
                 .padding(padding)
                 .fillMaxSize()
                 .background(Color(0xFFF1F8E9))
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Manage Categories", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text("Total Balance: $selectedCurrency ${"%.2f".format(totalBalanceConverted)}")
-            Text("Income: $selectedCurrency ${"%.2f".format(totalIncomeConverted)} | Expenses: $selectedCurrency ${"%.2f".format(totalExpenseConverted)}")
-
+            Text(
+                "Manage Categories",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2E7D32)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                "Total Balance: $selectedCurrency ${"%.2f".format(totalBalanceConverted)}",
+                fontSize = 14.sp,
+                color = Color.DarkGray
+            )
+            Text(
+                "Income: $selectedCurrency ${"%.2f".format(totalIncomeConverted)} | Expenses: $selectedCurrency ${"%.2f".format(totalExpenseConverted)}",
+                fontSize = 14.sp,
+                color = Color.DarkGray
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
                 value = categoryName,
@@ -128,7 +136,8 @@ fun ManageCategoriesScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Button(
                 onClick = {
@@ -144,53 +153,68 @@ fun ManageCategoriesScreen(navController: NavController) {
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Add Category", color = Color.Black)
+                Text("Add Category", color = Color.Black, fontWeight = FontWeight.SemiBold)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = { navController.navigate("categorySummary") },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFF176)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View Category Summary", color = Color.Black, fontWeight = FontWeight.Medium)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxHeight()
             ) {
                 items(categories) { category ->
                     Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
                         modifier = Modifier
-                            .aspectRatio(1f),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                            .aspectRatio(1f)
+                            .clickable {
+                                navController.navigate("categoryExpenses/${category.name}")
+                            }
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
                             verticalArrangement = Arrangement.SpaceBetween,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                category.name,
+                                text = category.name,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF388E3C),
-                                modifier = Modifier.clickable {
-                                    navController.navigate("categoryExpenses/${category.name}")
-                                }
-
+                                color = Color(0xFF388E3C)
                             )
-                            IconButton(onClick = {
-                                coroutineScope.launch {
-                                    val catSnap = db.collection("users").document(username)
-                                        .collection("categories")
-                                        .whereEqualTo("name", category.name)
-                                        .get().await()
-                                    catSnap.documents.firstOrNull()?.reference?.delete()
-                                    val catSnapshot = db.collection("users").document(username)
-                                        .collection("categories").get().await()
-                                    categories = catSnapshot.toObjects(Category::class.java)
-
+                            IconButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        val catSnap = db.collection("users").document(username)
+                                            .collection("categories")
+                                            .whereEqualTo("name", category.name)
+                                            .get().await()
+                                        catSnap.documents.firstOrNull()?.reference?.delete()
+                                        val catSnapshot = db.collection("users").document(username)
+                                            .collection("categories").get().await()
+                                        categories = catSnapshot.toObjects(Category::class.java)
+                                    }
                                 }
-                            }) {
+                            ) {
                                 Icon(Icons.Default.Delete, contentDescription = "Delete Category")
                             }
                         }

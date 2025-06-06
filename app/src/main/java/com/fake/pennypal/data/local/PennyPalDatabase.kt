@@ -9,7 +9,7 @@ import com.fake.pennypal.data.local.entities.User
 import com.fake.pennypal.data.local.entities.Expense
 import com.fake.pennypal.data.local.entities.Category
 
-@Database(entities = [User::class, Expense::class, Category::class], version = 1)
+@Database(entities = [User::class, Expense::class, Category::class], version = 1,  exportSchema = false)
 abstract class PennyPalDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun expenseDao(): ExpenseDao

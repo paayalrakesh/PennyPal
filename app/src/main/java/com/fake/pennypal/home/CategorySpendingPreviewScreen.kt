@@ -3,10 +3,13 @@ package com.fake.pennypal.home
 
 import com.fake.pennypal.data.model.Badge
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,6 +27,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.fake.pennypal.utils.getCurrentUsername
 import com.fake.pennypal.utils.SessionManager
 import com.fake.pennypal.utils.CurrencyConverter
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
@@ -65,16 +71,16 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     val username = remember { SessionManager(context).getLoggedInUser() ?: "" }
     val sessionManager = remember { SessionManager(context) }
     var selectedCurrency by remember { mutableStateOf(sessionManager.getSelectedCurrency()) }
-
     var selectedFilter by remember { mutableStateOf("Monthly") }
     var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
     var minGoal by remember { mutableStateOf(0.0) }
     var maxGoal by remember { mutableStateOf(20000.0) }
+    var recentExpensesGrouped by remember { mutableStateOf<Map<String, List<Expense>>>(emptyMap()) }
 
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     LaunchedEffect(selectedFilter, selectedCurrency) {
-        if (username.isEmpty()) return@LaunchedEffect  // ✅ Prevent crash if no user is logged in
+        if (username.isEmpty()) return@LaunchedEffect
 
         val (start, end) = getDateRange(selectedFilter)
 
@@ -84,10 +90,10 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
                 parsedDate != null && parsedDate in start..end
             }
-        println("🔍 Total expenses fetched: ${expenses.size}")
-        expenses.forEach {
-            println("➡️ ${it.category} | ${it.amount} | ${it.date}")
-        }
+
+        val recentExpensesByCategory = expenses.groupBy { it.category }
+            .mapValues { it.value.sortedByDescending { it.date }.take(3) }
+        recentExpensesGrouped = recentExpensesByCategory
 
         val grouped = expenses.groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
@@ -97,19 +103,16 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         }
 
         categoryTotals = converted
-        println("📊 categoryTotals = $categoryTotals")
-
-
         val totalSpent = converted.values.sum()
 
-        val goals = db.collection("users").document(username).collection("goals").document("default").get().await().data
+        val goals = db.collection("users").document(username)
+            .collection("goals").document("default").get().await().data
         if (goals != null) {
             minGoal = (goals["minSpendingGoal"] as? Number)?.toDouble() ?: 0.0
             maxGoal = (goals["spendingLimit"] as? Number)?.toDouble() ?: 20000.0
         }
 
         val badgeCollection = db.collection("users").document(username).collection("badges")
-
         if (totalSpent <= maxGoal) {
             val badge = hashMapOf(
                 "title" to "Budget Keeper",
@@ -135,10 +138,10 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
 
     LaunchedEffect(goalProgress) {
         if (goalProgress < 1.0) {
-            val badge = Badge(
+            val badge = com.fake.pennypal.data.model.Badge(
                 title = "Budget Master!",
                 description = "You stayed under your monthly spending goal.",
-                earnedDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                earnedDate = formatter.format(Date())
             )
             db.collection("users").document(username)
                 .collection("badges")
@@ -147,6 +150,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         }
     }
 
+    // ✅ Fixed Scaffold and Content
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -160,10 +164,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         },
         containerColor = Color(0xFFFFFDE7),
         bottomBar = {
-            NavigationBar(
-                containerColor = Color(0xFFFFEB3B),
-                contentColor = Color.Black
-            ) {
+            NavigationBar(containerColor = Color(0xFFFFEB3B), contentColor = Color.Black) {
                 IconButton(onClick = { navController.navigate("home") }) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
@@ -189,6 +190,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -197,22 +199,20 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 sessionManager.setSelectedCurrency(it)
             }
 
-            val balance = maxGoal - categoryTotals.values.sum()
-            val goalProgress = if (maxGoal > 0) (categoryTotals.values.sum() / maxGoal).coerceIn(0.0, 1.0) else 0.0
-            val expenseTotal = categoryTotals.values.sum()
-
-            val hasExpenses = categoryTotals.values.sum() > 0
+            val balance = maxGoal - totalSpent
+            val hasExpenses = totalSpent > 0
 
             if (hasExpenses) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4))
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Total Balance", style = MaterialTheme.typography.labelMedium)
-                        Text("$selectedCurrency ${"%.2f".format(balance)}", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+                        Text("Total Balance", fontSize = 14.sp)
+                        Text("$selectedCurrency ${"%.2f".format(balance)}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Total Expense: $selectedCurrency ${"%.2f".format(expenseTotal)}", color = Color.Red)
+                        Text("Total Expense: $selectedCurrency ${"%.2f".format(totalSpent)}", color = Color.Red)
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Goal Progress")
                         LinearProgressIndicator(
@@ -224,15 +224,13 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                     }
                 }
             } else {
-                Text("No expenses available for this period.", color = Color.Gray)
+                Text("No expenses available for this period.", color = Color.Gray, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
@@ -253,68 +251,139 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(16.dp))
 
             BarChartWithGoals(categoryTotals, minGoal, maxGoal, selectedCurrency)
-        }
-    }
 
-}
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Recent Expenses", fontWeight = FontWeight.Bold, fontSize = 18.sp)
 
+            recentExpensesGrouped.forEach { (category, items) ->
+                Text(category, fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
 
-@Composable
-fun BarChartWithGoals(data: Map<String, Double>, minGoal: Double, maxGoal: Double, selectedCurrency: String) {
-    val maxValue = (data.values.maxOrNull() ?: 1.0).coerceAtLeast(maxGoal)
-
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .height(300.dp)
-                    .fillMaxWidth()
-                    .background(Color.White, shape = RoundedCornerShape(12.dp)),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                data.forEach { (category, amount) ->
-                    val barHeightRatio = amount / maxValue
-                    val barHeight = (barHeightRatio * 200).coerceAtLeast(10.0)
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom,
-                        modifier = Modifier.height(260.dp)
-                    ) {
-                        Text("$selectedCurrency ${"%.0f".format(amount)}", fontSize = 12.sp)
-
-                        Box(
-                            modifier = Modifier
-                                .width(30.dp)
-                                .height(barHeight.dp)
-                                .background(
-                                    if (amount > maxGoal) Color.Red else Color(0xFF4CAF50),
-                                    shape = RoundedCornerShape(4.dp)
+                items.forEach { expense ->
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                navController.navigate(
+                                    "expenseDetail/${expense.date}/${expense.amount}/${expense.category}/${expense.description}/${expense.photoUrl}/${selectedCurrency}"
                                 )
-                        )
+                            }
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Date: ${expense.date}", fontSize = 12.sp)
+                            val convertedAmount = CurrencyConverter.convert(expense.amount, "ZAR", selectedCurrency)
+                            Text("Amount: $selectedCurrency ${"%.2f".format(convertedAmount)}", fontSize = 12.sp)
+                            Text("Description: ${expense.description}", fontSize = 12.sp)
 
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(category.take(6), fontSize = 10.sp)
+                            if (!expense.photoUrl.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Image(
+                                    painter = rememberAsyncImagePainter(model = expense.photoUrl),
+                                    contentDescription = "Expense Image",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(150.dp)
+                                        .background(Color.LightGray, shape = RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(100.dp)) // Final bottom padding
+        }
+    }
+}
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(horizontal = 8.dp)
+
+@Composable
+fun BarChartWithGoals(
+    categoryTotals: Map<String, Double>,
+    minGoal: Double,
+    maxGoal: Double,
+    currency: String
+) {
+    val maxAmount = (categoryTotals.values.maxOrNull() ?: 1.0).coerceAtLeast(maxGoal)
+    val barColor = Color(0xFFAED581) // Pastel green
+    val backgroundColor = Color(0xFFF3FCEB) // Light card background
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Income & Expenses",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                color = Color(0xFF2E7D32) // Dark green title
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
             ) {
-                Box(modifier = Modifier.size(16.dp, 4.dp).background(Color.Red))
-                Text("Max Goal", fontSize = 12.sp)
+                // Draw horizontal axis lines (optional styling)
+                repeat(4) { i ->
+                    val y = 40.dp * i
+                    Divider(
+                        color = Color.LightGray,
+                        thickness = 1.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopStart)
+                            .offset(y = y)
+                    )
+                }
 
-                Box(modifier = Modifier.size(16.dp, 4.dp).background(Color(0xFFFFEB3B)))
-                Text("Min Goal", fontSize = 12.sp)
+                // Bars
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 12.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    categoryTotals.entries.forEach { (category, amount) ->
+                        val heightRatio = (amount / maxAmount).coerceIn(0.0, 1.0)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Bottom,
+                            modifier = Modifier.height(140.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(16.dp)
+                                    .height((heightRatio * 100).dp)
+                                    .background(barColor, shape = RoundedCornerShape(8.dp))
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(category.take(3), fontSize = 10.sp, color = Color.DarkGray)
+                        }
+                    }
+                }
+            }
+
+            // Optional: goal line info
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Min: $currency ${"%.0f".format(minGoal)}", fontSize = 12.sp, color = Color(0xFF388E3C))
+                Text("Max: $currency ${"%.0f".format(maxGoal)}", fontSize = 12.sp, color = Color.Red)
             }
         }
     }

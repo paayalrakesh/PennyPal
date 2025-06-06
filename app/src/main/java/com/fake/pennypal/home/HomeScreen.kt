@@ -1,9 +1,13 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.fake.pennypal.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -30,7 +34,6 @@ fun HomeScreen(navController: NavController) {
     val sessionManager = remember { SessionManager(context) }
     val username = sessionManager.getLoggedInUser() ?: return
     val selectedCurrency = sessionManager.getSelectedCurrency()
-
 
     var incomeList by remember { mutableStateOf(emptyList<Income>()) }
     var expenseList by remember { mutableStateOf(emptyList<Expense>()) }
@@ -82,65 +85,109 @@ fun HomeScreen(navController: NavController) {
                 }
             }
         }
-    ) { padding ->
+    ) { paddingValues ->
+
         Column(
             modifier = Modifier
-                .padding(padding)
+                .padding(paddingValues)
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .background(Color(0xFFF1F8E9))
                 .padding(16.dp)
         ) {
-            Text("Hi, Welcome Back", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
+            Text(
+                text = "Hi, Welcome Back",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF388E3C)
+            )
+
             Spacer(modifier = Modifier.height(12.dp))
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Total Balance: $selectedCurrency ${"%.2f".format(balance)}", fontWeight = FontWeight.Bold)
-                    Text("Total Income: $selectedCurrency ${"%.2f".format(totalIncome)}", fontWeight = FontWeight.SemiBold, color = Color(0xFF2E7D32))
-                    Text("Total Expenses: -$selectedCurrency ${"%.2f".format(totalExpenses)}", fontWeight = FontWeight.SemiBold, color = Color.Red)
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Total Balance: $selectedCurrency ${"%.2f".format(balance)}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    Text(
+                        text = "Total Income: $selectedCurrency ${"%.2f".format(totalIncome)}",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        color = Color(0xFF2E7D32)
+                    )
+                    Text(
+                        text = "Total Expenses: -$selectedCurrency ${"%.2f".format(totalExpenses)}",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        color = Color.Red
+                    )
                     LinearProgressIndicator(
-                        progress = progress.coerceIn(0f, 1f),
+                        progress = progress,
                         color = Color(0xFF388E3C),
                         trackColor = Color.LightGray,
-                        modifier = Modifier.fillMaxWidth().height(8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
                     )
-                    Text("${(progress * 100).toInt()}% of your income spent", fontSize = 12.sp)
+                    Text(
+                        text = "${(progress * 100).toInt()}% of your income spent",
+                        fontSize = 12.sp
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            Text("Recent Transactions", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "Recent Transactions",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                items(expenseList) { expense ->
-                    val convertedAmount = CurrencyConverter.convert(expense.amount, "ZAR", selectedCurrency)
-                    Card(
+            // Manually render items because LazyColumn + verticalScroll don't work together
+            expenseList.forEach { expense ->
+                val convertedAmount = CurrencyConverter.convert(expense.amount, "ZAR", selectedCurrency)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        shape = RoundedCornerShape(12.dp),
-                        elevation = CardDefaults.cardElevation(2.dp)
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(expense.category, fontWeight = FontWeight.Bold)
-                                Text(expense.description, fontSize = 12.sp)
-                            }
-                            Text("$selectedCurrency ${"%.2f".format(convertedAmount)}", fontWeight = FontWeight.Bold)
+                        Column {
+                            Text(expense.category, fontWeight = FontWeight.Bold)
+                            Text(expense.description, fontSize = 12.sp)
                         }
+                        Text(
+                            text = "$selectedCurrency ${"%.2f".format(convertedAmount)}",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(80.dp)) // Prevent bottom nav from overlapping content
         }
     }
 }

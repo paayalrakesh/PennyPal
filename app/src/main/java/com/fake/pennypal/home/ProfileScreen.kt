@@ -34,11 +34,9 @@ fun ProfileScreen(navController: NavController) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // 💱 Currency support
     val currencyOptions = listOf("ZAR", "USD", "EUR", "GBP", "INR")
     var selectedCurrency by remember { mutableStateOf(sessionManager.getSelectedCurrency()) }
 
-    // Load user details and badges
     LaunchedEffect(Unit) {
         val currentUsername = sessionManager.getLoggedInUser() ?: return@LaunchedEffect
 
@@ -91,21 +89,21 @@ fun ProfileScreen(navController: NavController) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier.padding(20.dp)
                 ) {
-                    Text(fullName, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    Text("ID: $userId", fontSize = 14.sp, color = Color.Gray)
+                    Text(fullName, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                    Text("User ID: $userId", fontSize = 14.sp, color = Color.Gray)
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text("Your Badges", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            Text("🎖 Your Badges", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
 
             if (isLoading) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -115,14 +113,14 @@ fun ProfileScreen(navController: NavController) {
                 Text("No badges yet.")
             } else {
                 Spacer(modifier = Modifier.height(16.dp))
-                LazyColumn {
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
                     items(badges) { badge ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 6.dp),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF59D)),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp)
                         ) {
                             Text(
                                 text = badge,
@@ -136,7 +134,8 @@ fun ProfileScreen(navController: NavController) {
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-            Text("Preferred Currency", fontWeight = FontWeight.SemiBold)
+
+            Text("🌍 Preferred Currency", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
 
             DropdownMenuBox(
@@ -153,10 +152,10 @@ fun ProfileScreen(navController: NavController) {
             Button(
                 onClick = { navController.navigate("badgeScreen") },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEB3B)),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(vertical = 8.dp)
             ) {
                 Text("🏅 View Achievements", color = Color.Black)
             }
@@ -164,7 +163,7 @@ fun ProfileScreen(navController: NavController) {
             Button(
                 onClick = { showLogoutDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Logout", color = Color.White, fontSize = 16.sp)
@@ -199,7 +198,6 @@ fun ProfileScreen(navController: NavController) {
     }
 }
 
-// 🔽 Must be outside ProfileScreen!
 @Composable
 fun DropdownMenuBox(
     selected: String,
@@ -209,7 +207,11 @@ fun DropdownMenuBox(
     var expanded by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
             Text(selected)
         }
         DropdownMenu(
