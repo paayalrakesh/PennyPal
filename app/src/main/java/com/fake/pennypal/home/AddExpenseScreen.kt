@@ -1,5 +1,7 @@
 package com.fake.pennypal.home
 
+import com.fake.pennypal.data.local.entities.Expense as RoomExpense
+import com.fake.pennypal.data.model.Expense as FirebaseExpense
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.net.Uri
@@ -21,8 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.room.Room
+import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.tasks.await
+import java.util.UUID
 import com.fake.pennypal.data.local.PennyPalDatabase
-import com.fake.pennypal.data.local.entities.Expense
 import com.fake.pennypal.utils.SessionManager
 import com.fake.pennypal.utils.getCurrentUsername
 import com.google.firebase.firestore.FirebaseFirestore
@@ -32,6 +36,8 @@ import java.util.*
 @Composable
 fun AddExpenseScreen(navController: NavController) {
     val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+    val selectedCurrency = sessionManager.getSelectedCurrency()
 
     val db = remember {
         Room.databaseBuilder(
@@ -41,6 +47,8 @@ fun AddExpenseScreen(navController: NavController) {
     }
     val expenseDao = db.expenseDao()
     val coroutineScope = rememberCoroutineScope()
+    val storage = FirebaseStorage.getInstance()
+    val storageRef = storage.reference
 
     var date by remember { mutableStateOf("") }
     var startTime by remember { mutableStateOf("") }
@@ -129,8 +137,13 @@ fun AddExpenseScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount") },
-                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Amount in $selectedCurrency") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -152,40 +165,58 @@ fun AddExpenseScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = {
-                if (date.isNotEmpty() && amount.isNotEmpty() && category.isNotEmpty()) {
-                    coroutineScope.launch {
-                        val expense = Expense(
-                            date = date,
-                            amount = amount.toDoubleOrNull() ?: 0.0,
-                            category = category,
-                            description = description,
-                            photoUri = photoUri?.toString()
-                        )
+            Button(
+                onClick = {
+                    if (date.isNotEmpty() && amount.isNotEmpty() && category.isNotEmpty()) {
+                        coroutineScope.launch {
+                            val username = SessionManager(context).getLoggedInUser() ?: return@launch
+                            var downloadUrl = ""
 
-                        expenseDao.insertExpense(expense)
+                            photoUri?.let { uri ->
+                                try {
+                                    val imageRef = storageRef.child("users/$username/expenses/${UUID.randomUUID()}.jpg")
+                                    imageRef.putFile(uri).await()
+                                    downloadUrl = imageRef.downloadUrl.await().toString()
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
 
-                        // 🔁 Save in Firestore under current user's username
-                        val firebaseExpense = hashMapOf(
-                            "date" to expense.date,
-                            "amount" to expense.amount,
-                            "category" to expense.category,
-                            "description" to expense.description,
-                            "photoUri" to (expense.photoUri ?: "")
-                        )
+                            // ✅ Save to Room
+                            val roomExpense = RoomExpense(
+                                date = date,
+                                amount = amount.toDoubleOrNull() ?: 0.0,
+                                category = category,
+                                description = description,
+                                photoUri = downloadUrl // If your Room model includes this field
+                            )
+                            expenseDao.insertExpense(roomExpense)
 
-                        val username = SessionManager(context).getLoggedInUser() ?: return@launch
-                        FirebaseFirestore.getInstance()
-                            .collection("users")
-                            .document(username)
-                            .collection("expenses")
-                            .add(firebaseExpense)
+                            // ✅ Save to Firebase
+                            val firebaseExpense = FirebaseExpense(
+                                date = date,
+                                amount = amount.toDoubleOrNull() ?: 0.0,
+                                category = category,
+                                description = description,
+                                startTime = startTime,
+                                endTime = endTime,
+                                photoUrl = downloadUrl
+                            )
+                            FirebaseFirestore.getInstance()
+                                .collection("users")
+                                .document(username)
+                                .collection("expenses")
+                                .add(firebaseExpense)
 
-                        navController.popBackStack()
+
+                            navController.popBackStack()
+                        }
                     }
-                }
-            }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
-                shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text("Save Expense", color = Color.White)
             }
         }

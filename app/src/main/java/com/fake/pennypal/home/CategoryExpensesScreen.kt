@@ -18,6 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import coil.compose.rememberAsyncImagePainter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,8 @@ import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.fake.pennypal.data.model.Expense
 import com.google.firebase.firestore.FirebaseFirestore
+import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.utils.CurrencyConverter
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
@@ -33,6 +36,9 @@ import java.util.*
 @Composable
 fun CategoryExpensesScreen(navController: NavController, categoryName: String) {
     val db = FirebaseFirestore.getInstance()
+    val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+    val selectedCurrency = sessionManager.getSelectedCurrency()
     var selectedFilter by remember { mutableStateOf("Monthly") }
     var expenses by remember { mutableStateOf(listOf<Expense>()) }
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
@@ -90,7 +96,7 @@ fun CategoryExpensesScreen(navController: NavController, categoryName: String) {
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(expenses) { expense ->
-                        ExpenseCard(expense)
+                        ExpenseCard(expense, selectedCurrency)
                     }
                 }
             }
@@ -120,7 +126,7 @@ fun FilterRow(selected: String, onFilterSelected: (String) -> Unit) {
 }
 
 @Composable
-fun ExpenseCard(expense: Expense) {
+fun ExpenseCard(expense: Expense, selectedCurrency: String){
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -128,12 +134,13 @@ fun ExpenseCard(expense: Expense) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Date: ${expense.date}", fontWeight = FontWeight.Bold)
-            Text("Amount: R${"%.2f".format(expense.amount)}")
+            val convertedAmount = CurrencyConverter.convert(expense.amount, "ZAR", selectedCurrency)
+            Text("Amount: $selectedCurrency ${"%.2f".format(convertedAmount)}")
             Text("Description: ${expense.description}")
-            if (!expense.photoUri.isNullOrEmpty()) {
+            if (!expense.photoUrl.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Image(
-                    painter = rememberAsyncImagePainter(model = Uri.parse(expense.photoUri)),
+                    painter = rememberAsyncImagePainter(model = Uri.parse(expense.photoUrl)),
                     contentDescription = "Expense Photo",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

@@ -21,4 +21,13 @@ class SessionManager(context: Context) {
     fun isLoggedIn(): Boolean {
         return getLoggedInUser() != null
     }
+    fun setSelectedCurrency(currencyCode: String) {
+        prefs.edit().putString("currency", currencyCode).apply()
+    }
+
+    fun getSelectedCurrency(): String {
+        return prefs.getString("currency", "ZAR") ?: "ZAR" // Default to ZAR
+    }
+
+
 }

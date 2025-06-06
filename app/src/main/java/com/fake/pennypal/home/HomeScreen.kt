@@ -20,6 +20,7 @@ import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
 import com.fake.pennypal.data.model.Income
 import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.utils.CurrencyConverter
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
@@ -28,6 +29,8 @@ fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val username = sessionManager.getLoggedInUser() ?: return
+    val selectedCurrency = sessionManager.getSelectedCurrency()
+
 
     var incomeList by remember { mutableStateOf(emptyList<Income>()) }
     var expenseList by remember { mutableStateOf(emptyList<Expense>()) }
@@ -43,9 +46,14 @@ fun HomeScreen(navController: NavController) {
         expenseList = expenses
     }
 
-    val totalIncome = incomeList.sumOf { it.amount }
-    val totalExpenses = expenseList.sumOf { it.amount }
-    val balance = totalIncome - totalExpenses
+    val totalIncomeZAR = incomeList.sumOf { it.amount }
+    val totalExpensesZAR = expenseList.sumOf { it.amount }
+    val balanceZAR = totalIncomeZAR - totalExpensesZAR
+
+    val totalIncome = CurrencyConverter.convert(totalIncomeZAR, "ZAR", selectedCurrency)
+    val totalExpenses = CurrencyConverter.convert(totalExpensesZAR, "ZAR", selectedCurrency)
+    val balance = CurrencyConverter.convert(balanceZAR, "ZAR", selectedCurrency)
+
     val progress = if (totalIncome > 0) (totalExpenses / totalIncome).toFloat() else 0f
 
     Scaffold(
@@ -91,9 +99,9 @@ fun HomeScreen(navController: NavController) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Total Balance: R${"%.2f".format(balance)}", fontWeight = FontWeight.Bold)
-                    Text("Total Income: R${"%.2f".format(totalIncome)}", fontWeight = FontWeight.SemiBold, color = Color(0xFF2E7D32))
-                    Text("Total Expenses: -R${"%.2f".format(totalExpenses)}", fontWeight = FontWeight.SemiBold, color = Color.Red)
+                    Text("Total Balance: $selectedCurrency ${"%.2f".format(balance)}", fontWeight = FontWeight.Bold)
+                    Text("Total Income: $selectedCurrency ${"%.2f".format(totalIncome)}", fontWeight = FontWeight.SemiBold, color = Color(0xFF2E7D32))
+                    Text("Total Expenses: -$selectedCurrency ${"%.2f".format(totalExpenses)}", fontWeight = FontWeight.SemiBold, color = Color.Red)
                     LinearProgressIndicator(
                         progress = progress.coerceIn(0f, 1f),
                         color = Color(0xFF388E3C),
@@ -111,6 +119,7 @@ fun HomeScreen(navController: NavController) {
 
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(expenseList) { expense ->
+                    val convertedAmount = CurrencyConverter.convert(expense.amount, "ZAR", selectedCurrency)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

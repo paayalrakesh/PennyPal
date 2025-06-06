@@ -4,6 +4,12 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,11 +28,36 @@ import java.util.*
 @Composable
 fun AddIncomeScreen(navController: NavController) {
     val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
+    val selectedCurrency = sessionManager.getSelectedCurrency()
+
     var date by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-
-    Scaffold { padding ->
+    Scaffold(
+        bottomBar = {
+            NavigationBar(
+                containerColor = Color(0xFFFFEB3B),
+                contentColor = Color.Black
+            ) {
+                IconButton(onClick = { navController.navigate("home") }) {
+                    Icon(Icons.Default.Home, contentDescription = "Home")
+                }
+                IconButton(onClick = { navController.navigate("manageCategories") }) {
+                    Icon(Icons.Default.List, contentDescription = "Categories")
+                }
+                IconButton(onClick = { navController.navigate("addChoice") }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
+                }
+                IconButton(onClick = { navController.navigate("goals") }) {
+                    Icon(Icons.Default.Star, contentDescription = "Goals")
+                }
+                IconButton(onClick = { navController.navigate("profile") }) {
+                    Icon(Icons.Default.Person, contentDescription = "Profile")
+                }
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -63,7 +94,7 @@ fun AddIncomeScreen(navController: NavController) {
             OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it },
-                label = { Text("Amount") },
+                label = { Text("Amount in $selectedCurrency") }, // 💬 Updated label
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )

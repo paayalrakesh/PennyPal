@@ -23,6 +23,7 @@ import com.fake.pennypal.data.model.Category
 import com.fake.pennypal.data.model.Expense
 import com.fake.pennypal.data.model.Income
 import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.utils.CurrencyConverter
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -32,15 +33,34 @@ fun ManageCategoriesScreen(navController: NavController) {
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
     val username = SessionManager(context).getLoggedInUser() ?: return
+    val sessionManager = remember { SessionManager(context) }
+    val selectedCurrency = sessionManager.getSelectedCurrency()
     val coroutineScope = rememberCoroutineScope()
     var categoryName by remember { mutableStateOf("") }
     var categories by remember { mutableStateOf(listOf<Category>()) }
-    var selectedExpenses by remember { mutableStateOf(listOf<Expense>()) }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
 
-    var totalIncome by remember { mutableStateOf(0.0) }
-    var totalExpense by remember { mutableStateOf(0.0) }
-    val totalBalance = totalIncome - totalExpense
+    var totalIncomeZAR by remember { mutableStateOf(0.0) }
+    var totalExpenseZAR by remember { mutableStateOf(0.0) }
+
+    val totalIncomeConverted by remember(totalIncomeZAR, selectedCurrency) {
+        derivedStateOf {
+            CurrencyConverter.convert(totalIncomeZAR, "ZAR", selectedCurrency)
+        }
+    }
+    val totalExpenseConverted by remember(totalExpenseZAR, selectedCurrency) {
+        derivedStateOf {
+            CurrencyConverter.convert(totalExpenseZAR, "ZAR", selectedCurrency)
+        }
+    }
+
+    val totalBalanceConverted by remember(totalIncomeZAR, totalExpenseZAR, selectedCurrency) {
+        derivedStateOf {
+            CurrencyConverter.convert(totalIncomeZAR - totalExpenseZAR, "ZAR", selectedCurrency)
+        }
+    }
+
+
 
     // Load categories and balance
     LaunchedEffect(Unit) {
@@ -51,11 +71,11 @@ fun ManageCategoriesScreen(navController: NavController) {
 
             val incomeSnap = db.collection("users").document(username)
                 .collection("incomes").get().await()
-            totalIncome = incomeSnap.toObjects(Income::class.java).sumOf { it.amount }
+            totalIncomeZAR = incomeSnap.toObjects(Income::class.java).sumOf { it.amount }
 
             val expenseSnap = db.collection("users").document(username)
                 .collection("expenses").get().await()
-            totalExpense = expenseSnap.toObjects(Expense::class.java).sumOf { it.amount }
+            totalExpenseZAR = expenseSnap.toObjects(Expense::class.java).sumOf { it.amount }
         }
     }
 
@@ -95,8 +115,9 @@ fun ManageCategoriesScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text("Total Balance: R${"%.2f".format(totalBalance)}", color = Color.Black, fontWeight = FontWeight.Bold)
-            Text("Income: R${"%.2f".format(totalIncome)} | Expenses: R${"%.2f".format(totalExpense)}", color = Color.Gray)
+            Text("Total Balance: $selectedCurrency ${"%.2f".format(totalBalanceConverted)}")
+            Text("Income: $selectedCurrency ${"%.2f".format(totalIncomeConverted)} | Expenses: $selectedCurrency ${"%.2f".format(totalExpenseConverted)}")
+
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -115,7 +136,7 @@ fun ManageCategoriesScreen(navController: NavController) {
                         coroutineScope.launch {
                             db.collection("users").document(username).collection("categories")
                                 .add(Category(name = categoryName))
-                            val catSnapshot = db.collection("categories").get().await()
+                            val catSnapshot = db.collection("users").document(username).collection("categories").get().await()
                             categories = catSnapshot.toObjects(Category::class.java)
                             categoryName = ""
                         }
@@ -158,7 +179,8 @@ fun ManageCategoriesScreen(navController: NavController) {
                             )
                             IconButton(onClick = {
                                 coroutineScope.launch {
-                                    val catSnap = db.collection("categories")
+                                    val catSnap = db.collection("users").document(username)
+                                        .collection("categories")
                                         .whereEqualTo("name", category.name)
                                         .get().await()
                                     catSnap.documents.firstOrNull()?.reference?.delete()

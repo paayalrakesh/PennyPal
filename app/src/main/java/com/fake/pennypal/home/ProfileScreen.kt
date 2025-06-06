@@ -1,3 +1,4 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
 
 import androidx.compose.foundation.background
@@ -33,6 +34,10 @@ fun ProfileScreen(navController: NavController) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
 
+    // 💱 Currency support
+    val currencyOptions = listOf("ZAR", "USD", "EUR", "GBP", "INR")
+    var selectedCurrency by remember { mutableStateOf(sessionManager.getSelectedCurrency()) }
+
     // Load user details and badges
     LaunchedEffect(Unit) {
         val currentUsername = sessionManager.getLoggedInUser() ?: return@LaunchedEffect
@@ -50,7 +55,6 @@ fun ProfileScreen(navController: NavController) {
         badges = badgeSnapshot.documents.mapNotNull { it.getString("name") }
         isLoading = false
     }
-
 
     Scaffold(
         bottomBar = {
@@ -132,6 +136,19 @@ fun ProfileScreen(navController: NavController) {
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+            Text("Preferred Currency", fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DropdownMenuBox(
+                selected = selectedCurrency,
+                onSelected = {
+                    selectedCurrency = it
+                    sessionManager.setSelectedCurrency(it)
+                },
+                options = currencyOptions
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = { navController.navigate("badgeScreen") },
@@ -176,6 +193,36 @@ fun ProfileScreen(navController: NavController) {
                     },
                     title = { Text("Log Out") },
                     text = { Text("Are you sure you want to log out?") }
+                )
+            }
+        }
+    }
+}
+
+// 🔽 Must be outside ProfileScreen!
+@Composable
+fun DropdownMenuBox(
+    selected: String,
+    onSelected: (String) -> Unit,
+    options: List<String>
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(selected)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { currency ->
+                DropdownMenuItem(
+                    text = { Text(currency) },
+                    onClick = {
+                        onSelected(currency)
+                        expanded = false
+                    }
                 )
             }
         }

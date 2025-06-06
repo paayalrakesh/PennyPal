@@ -22,9 +22,40 @@ import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
 import com.google.firebase.firestore.FirebaseFirestore
 import com.fake.pennypal.utils.getCurrentUsername
+import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.utils.CurrencyConverter
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
+
+@Composable
+fun CurrencyDropdown(
+    selected: String,
+    onSelected: (String) -> Unit
+) {
+    val options = CurrencyConverter.getAvailableCurrencies()
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        OutlinedButton(onClick = { expanded = true }) {
+            Text(selected)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach {
+                DropdownMenuItem(
+                    text = { Text(it) },
+                    onClick = {
+                        onSelected(it)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
 
 
 @Composable
@@ -32,7 +63,8 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     val db = FirebaseFirestore.getInstance()
     val context = LocalContext.current
     val username = getCurrentUsername(context)
-
+    val sessionManager = remember { SessionManager(context) }
+    var selectedCurrency by remember { mutableStateOf(sessionManager.getSelectedCurrency()) }
 
     var selectedFilter by remember { mutableStateOf("Monthly") }
     var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
@@ -41,7 +73,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
 
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    LaunchedEffect(selectedFilter) {
+    LaunchedEffect(selectedFilter, selectedCurrency) {
         val (start, end) = getDateRange(selectedFilter)
 
         val expenses = db.collection("users").document(username).collection("expenses").get().await()
@@ -54,9 +86,13 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         val grouped = expenses.groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
 
-        categoryTotals = grouped
+        val converted = grouped.mapValues { (_, amount) ->
+            CurrencyConverter.convert(amount, "ZAR", selectedCurrency)
+        }
 
-        val totalSpent = grouped.values.sum()
+        categoryTotals = converted
+
+        val totalSpent = converted.values.sum()
 
         val goals = db.collection("users").document(username).collection("goals").document("default").get().await().data
         if (goals != null) {
@@ -64,7 +100,6 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
             maxGoal = (goals["spendingLimit"] as? Number)?.toDouble() ?: 20000.0
         }
 
-        // 🔸 AUTOMATIC BADGE REWARD SYSTEM 🔸
         val badgeCollection = db.collection("users").document(username).collection("badges")
 
         if (totalSpent <= maxGoal) {
@@ -127,7 +162,6 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
                     Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph")
                 }
-
                 IconButton(onClick = { navController.navigate("manageCategories") }) {
                     Icon(Icons.Default.List, contentDescription = "Categories")
                 }
@@ -150,28 +184,39 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            CurrencyDropdown(selectedCurrency) {
+                selectedCurrency = it
+                sessionManager.setSelectedCurrency(it)
+            }
+
             val balance = maxGoal - categoryTotals.values.sum()
             val goalProgress = if (maxGoal > 0) (categoryTotals.values.sum() / maxGoal).coerceIn(0.0, 1.0) else 0.0
             val expenseTotal = categoryTotals.values.sum()
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Total Balance", style = MaterialTheme.typography.labelMedium)
-                    Text("R${"%.2f".format(balance)}", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Total Expense: R${"%.2f".format(expenseTotal)}", color = Color.Red)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Goal Progress")
-                    LinearProgressIndicator(
-                        progress = goalProgress.toFloat(),
-                        modifier = Modifier.fillMaxWidth().height(8.dp),
-                        color = Color(0xFF4CAF50)
-                    )
-                    Text("${(goalProgress * 100).toInt()}% of your spending goal")
+            val hasExpenses = categoryTotals.values.sum() > 0
+
+            if (hasExpenses) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Total Balance", style = MaterialTheme.typography.labelMedium)
+                        Text("$selectedCurrency ${"%.2f".format(balance)}", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Total Expense: $selectedCurrency ${"%.2f".format(expenseTotal)}", color = Color.Red)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Goal Progress")
+                        LinearProgressIndicator(
+                            progress = goalProgress.toFloat(),
+                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                            color = Color(0xFF4CAF50)
+                        )
+                        Text("${(goalProgress * 100).toInt()}% of your spending goal")
+                    }
                 }
+            } else {
+                Text("No expenses available for this period.", color = Color.Gray)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -190,23 +235,24 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                             containerColor = if (selectedFilter == label) Color(0xFFFFEB3B) else Color.LightGray
                         ),
                         shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.width(100.dp) // Ensures consistent button size
+                        modifier = Modifier.width(100.dp)
                     ) {
                         Text(label, color = Color.Black, fontSize = 12.sp)
                     }
                 }
             }
 
-
             Spacer(modifier = Modifier.height(16.dp))
 
-            BarChartWithGoals(categoryTotals, minGoal, maxGoal)
+            BarChartWithGoals(categoryTotals, minGoal, maxGoal, selectedCurrency)
         }
     }
+
 }
 
+
 @Composable
-fun BarChartWithGoals(data: Map<String, Double>, minGoal: Double, maxGoal: Double) {
+fun BarChartWithGoals(data: Map<String, Double>, minGoal: Double, maxGoal: Double, selectedCurrency: String) {
     val maxValue = (data.values.maxOrNull() ?: 1.0).coerceAtLeast(maxGoal)
 
     Card(
@@ -232,7 +278,7 @@ fun BarChartWithGoals(data: Map<String, Double>, minGoal: Double, maxGoal: Doubl
                         verticalArrangement = Arrangement.Bottom,
                         modifier = Modifier.height(260.dp)
                     ) {
-                        Text("R${"%.0f".format(amount)}", fontSize = 12.sp)
+                        Text("$selectedCurrency ${"%.0f".format(amount)}", fontSize = 12.sp)
 
                         Box(
                             modifier = Modifier

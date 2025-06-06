@@ -8,5 +8,5 @@ data class Expense(
     val description: String = "",
     val startTime: String = "",
     val endTime: String = "",
-    val photoUri: String? = null
+    val photoUrl: String? = null
 )
