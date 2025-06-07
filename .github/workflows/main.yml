@@ -7,7 +7,7 @@ on:
   # Run the workflow when a pull request is merged into the 'main' branch
   push:
     branches:
-      - 'main'
+      - 'master'
     types:
       - closed  # Ensures it only runs when the PR is merged (not just opened)
   # Allows you to manually trigger this workflow from the GitHub Actions tab
