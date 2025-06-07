@@ -50,7 +50,6 @@ import com.fake.pennypal.data.model.Badge
 import com.fake.pennypal.utils.SessionManager
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.toObject
-import kotlinx.coroutines.tasks.await
 
 private const val TAG = "ProfileScreen"
 
@@ -62,23 +61,21 @@ fun ProfileScreen(navController: NavController) {
 
     var fullName by remember { mutableStateOf("Loading...") }
     var userId by remember { mutableStateOf("Loading...") }
-    // FIX: The state will now hold a list of the full Badge objects, not just strings.
     var badges by remember { mutableStateOf(listOf<Badge>()) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
 
+    var showBadgesDialog by remember { mutableStateOf(false) }
+
     val currencyOptions = listOf("ZAR", "USD", "EUR", "GBP", "INR")
     var selectedCurrency by remember { mutableStateOf(sessionManager.getSelectedCurrency()) }
 
-    // Use DisposableEffect for real-time listeners to prevent memory leaks.
-    // This effect runs when the screen is first composed and cleans up when it's left.
     DisposableEffect(Unit) {
         val currentUsername = sessionManager.getLoggedInUser()
         if (currentUsername.isNullOrBlank()) {
             isLoading = false
             onDispose { }
         } else {
-            // --- One-time fetch for user info (doesn't change often) ---
             db.collection("users").document(currentUsername).get()
                 .addOnSuccessListener { userDoc ->
                     fullName = userDoc.getString("name") ?: currentUsername
@@ -90,24 +87,20 @@ fun ProfileScreen(navController: NavController) {
                     userId = "Error"
                 }
 
-            // --- Real-time listener for badges ---
-            Log.d(TAG, "Setting up real-time badge listener for user: $currentUsername")
             val badgesListener = db.collection("users").document(currentUsername)
                 .collection("badges")
                 .addSnapshotListener { snapshot, error ->
-                    isLoading = false // Stop loading once we get a response (even an empty one).
+                    isLoading = false
                     if (error != null) {
                         Log.e(TAG, "Badge listener failed.", error)
                         return@addSnapshotListener
                     }
                     if (snapshot != null) {
-                        // FIX: Correctly map the Firestore documents to our Badge data class.
                         badges = snapshot.documents.mapNotNull { it.toObject(Badge::class.java) }
                         Log.d(TAG, "Real-time badge update. Found ${badges.size} badges.")
                     }
                 }
 
-            // Cleanup function to remove the listener when the screen is disposed.
             onDispose {
                 Log.d(TAG, "Removing badge listener.")
                 badgesListener.remove()
@@ -132,13 +125,11 @@ fun ProfileScreen(navController: NavController) {
             }
         }
     ) { padding ->
-        // The main layout now uses a standard Column with verticalScroll.
-        // LazyColumn is removed because the number of badges is expected to be small.
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()) // Allow the whole screen to scroll
+                .verticalScroll(rememberScrollState())
                 .background(Color(0xFFF1F8E9))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -160,7 +151,7 @@ fun ProfileScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text("🎖 Your Badges", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            Text("🎖️ Your Badges", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(16.dp))
 
             if (isLoading) {
@@ -168,28 +159,27 @@ fun ProfileScreen(navController: NavController) {
             } else if (badges.isEmpty()) {
                 Text("No badges earned yet. Keep working on your goals!")
             } else {
-                // Display the full badge details directly here.
-                badges.forEach { badge ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF59D)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            // FIX: Use badge.title, not just badge.
-                            Text(badge.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(badge.description, style = MaterialTheme.typography.bodyMedium)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Earned on: ${badge.earnedDate}", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
+                // CHANGE: Changed button color to primary yellow
+                Button(
+                    onClick = { showBadgesDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFEB3B),
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = "Badges Icon",
+                        modifier = Modifier.size(ButtonDefaults.IconSize)
+                    )
+                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                    Text("View Your ${badges.size} Badges")
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f)) // Pushes content below it to the bottom
+            Spacer(modifier = Modifier.weight(1f))
 
             Text("🌍 Preferred Currency", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
@@ -205,40 +195,82 @@ fun ProfileScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-
+            // CHANGE: Changed logout button from Red to thematic Green
             Button(
                 onClick = { showLogoutDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF388E3C)),
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Logout", color = Color.White, fontSize = 16.sp)
             }
+        }
 
-            if (showLogoutDialog) {
-                AlertDialog(
-                    onDismissRequest = { showLogoutDialog = false },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                sessionManager.logout()
-                                showLogoutDialog = false
-                                // Navigate to login and clear the back stack
-                                navController.navigate("login") {
-                                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                }
+        if (showBadgesDialog) {
+            BadgesDialog(
+                badges = badges,
+                onDismiss = { showBadgesDialog = false }
+            )
+        }
+
+        if (showLogoutDialog) {
+            AlertDialog(
+                onDismissRequest = { showLogoutDialog = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            sessionManager.logout()
+                            showLogoutDialog = false
+                            navController.navigate("login") {
+                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
                             }
-                        ) { Text("Yes") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showLogoutDialog = false }) { Text("Cancel") }
-                    },
-                    title = { Text("Log Out") },
-                    text = { Text("Are you sure you want to log out?") }
-                )
-            }
+                        }
+                    ) { Text("Yes") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLogoutDialog = false }) { Text("Cancel") }
+                },
+                title = { Text("Log Out") },
+                text = { Text("Are you sure you want to log out?") }
+            )
         }
     }
+}
+
+@Composable
+fun BadgesDialog(badges: List<Badge>, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Your Earned Badges", fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(badges) { badge ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF59D)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(badge.title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(badge.description, style = MaterialTheme.typography.bodyMedium)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Earned on: ${badge.earnedDate}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 @Composable
@@ -248,7 +280,6 @@ fun DropdownMenuBox(
     options: List<String>
 ) {
     var expanded by remember { mutableStateOf(false) }
-
     Box(modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(
             onClick = { expanded = true },

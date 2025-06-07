@@ -102,6 +102,13 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     var totalSpentInPeriod by remember { mutableStateOf(0.0) }
     var goalProgress by remember { mutableStateOf(0.0) }
 
+    var totalAllTimeIncome by remember { mutableStateOf(0.0) }
+    var totalAllTimeExpenses by remember { mutableStateOf(0.0) }
+
+    // CHANGE: Create state variables to hold the converted goal values
+    var minSpendingGoal by remember { mutableStateOf(0.0) }
+    var maxSpendingGoal by remember { mutableStateOf(0.0) }
+
     // State for raw data from Firestore real-time listeners
     var allExpenses by remember { mutableStateOf(listOf<Expense>()) }
     var allIncomes by remember { mutableStateOf(listOf<Income>()) }
@@ -109,7 +116,6 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     // EFFECT 1: REAL-TIME LISTENERS
-    // This effect runs once when the user enters the screen and sets up live listeners.
     DisposableEffect(username) {
         if (username.isBlank()) { onDispose {} }
 
@@ -138,7 +144,6 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     }
 
     // EFFECT 2: DATA PROCESSOR, CALCULATOR, AND BADGE AWARDER
-    // This effect re-runs all calculations whenever the live data, filter, or currency changes.
     LaunchedEffect(allExpenses, allIncomes, selectedFilter, selectedCurrency, username) {
         if (username.isBlank()) return@LaunchedEffect
 
@@ -148,7 +153,10 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         val totalIncomeZAR = allIncomes.sumOf { it.amount }
         val totalExpensesZAR = allExpenses.sumOf { it.amount }
         val trueBalanceZAR = totalIncomeZAR - totalExpensesZAR
+
         trueBalance = CurrencyConverter.convert(trueBalanceZAR, "ZAR", selectedCurrency)
+        totalAllTimeIncome = CurrencyConverter.convert(totalIncomeZAR, "ZAR", selectedCurrency)
+        totalAllTimeExpenses = CurrencyConverter.convert(totalExpensesZAR, "ZAR", selectedCurrency)
 
         // Filter Expenses for the selected period
         val (start, end) = getDateRange(selectedFilter)
@@ -173,8 +181,11 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
             val minGoalZAR = goalsDoc.getDouble("minSpendingGoal") ?: 0.0
             val maxGoalZAR = goalsDoc.getDouble("spendingLimit") ?: 20000.0
 
-            val maxGoalConverted = CurrencyConverter.convert(maxGoalZAR, "ZAR", selectedCurrency)
-            goalProgress = if (maxGoalConverted > 0) (totalSpentInPeriod / maxGoalConverted).coerceIn(0.0, 1.0) else 0.0
+            // CHANGE: Update the state variables with the converted goal values
+            minSpendingGoal = CurrencyConverter.convert(minGoalZAR, "ZAR", selectedCurrency)
+            maxSpendingGoal = CurrencyConverter.convert(maxGoalZAR, "ZAR", selectedCurrency)
+
+            goalProgress = if (maxSpendingGoal > 0) (totalSpentInPeriod / maxSpendingGoal).coerceIn(0.0, 1.0) else 0.0
 
             // BADGE AWARDING LOGIC
             val totalSpentInPeriodZAR = totalsInPeriodZAR.values.sum()
@@ -234,20 +245,58 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
             val hasTransactions = allIncomes.isNotEmpty() || allExpenses.isNotEmpty()
 
             if (hasTransactions) {
-                Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Total Balance", fontSize = 14.sp)
-                        Text("$selectedCurrency ${"%.2f".format(trueBalance)}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("${selectedFilter} Expense: $selectedCurrency ${"%.2f".format(totalSpentInPeriod)}", color = Color.Red)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Goal Progress")
-                        LinearProgressIndicator(progress = goalProgress.toFloat(), modifier = Modifier.fillMaxWidth().height(8.dp), color = Color(0xFF4CAF50))
-                        Text("${(goalProgress * 100).toInt()}% of your spending goal")
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // --- All-Time Summary (Consistent with HomeScreen) ---
+                        Text(
+                            text = "Total Balance: $selectedCurrency ${"%.2f".format(trueBalance)}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        Text(
+                            text = "Total Income: $selectedCurrency ${"%.2f".format(totalAllTimeIncome)}",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            color = Color(0xFF2E7D32)
+                        )
+                        Text(
+                            text = "Total Expenses: -$selectedCurrency ${"%.2f".format(totalAllTimeExpenses)}",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            color = Color.Red
+                        )
+
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                        // --- Period-Specific Summary ---
+                        Text(
+                            text = "${selectedFilter} Expense: $selectedCurrency ${"%.2f".format(totalSpentInPeriod)}",
+                            color = Color.Red,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Goal Progress for ${selectedFilter.lowercase()}")
+                        LinearProgressIndicator(
+                            progress = goalProgress.toFloat(),
+                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                            color = Color(0xFF4CAF50),
+                            trackColor = Color.LightGray
+                        )
+                        Text(
+                            text = "${(goalProgress * 100).toInt()}% of your spending goal",
+                            fontSize = 12.sp
+                        )
                     }
                 }
             } else {
-                Text("No transactions found.", color = Color.Gray, fontSize = 14.sp)
+                Text("No transactions found.", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(top = 16.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -259,7 +308,10 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            BarChartWithGoals(categoryTotals, 0.0, 0.0, selectedCurrency) // Note: Pass actual converted goals here if needed for the chart
+
+            // CHANGE: Pass the state variables to the bar chart
+            BarChartWithGoals(categoryTotals, minSpendingGoal, maxSpendingGoal, selectedCurrency)
+
             Spacer(modifier = Modifier.height(24.dp))
             Text("Recent Expenses", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             recentExpensesGrouped.forEach { (category, items) ->
@@ -283,7 +335,6 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         }
     }
 }
-
 
 @Composable
 fun BarChartWithGoals(
