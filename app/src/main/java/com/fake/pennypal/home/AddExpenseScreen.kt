@@ -258,7 +258,7 @@ fun AddExpenseScreen(navController: NavController) {
                             val amountInSelectedCurrency = amount.toDoubleOrNull() ?: return@launch
                             Log.d(TAG, "User entered amount: $amountInSelectedCurrency in $selectedCurrency")
 
-                            // Step 2: **THE FIX** - Convert the input amount from the selected currency BACK to the base currency (ZAR).
+                            // Step 2: Convert the input amount from the selected currency BACK to the base currency (ZAR).
                             // This ensures all data stored in the database is in a consistent, single currency.
                             val amountToSaveInZAR = CurrencyConverter.convert(amountInSelectedCurrency, selectedCurrency, "ZAR")
                             Log.d(TAG, "Converted amount to ZAR for saving: $amountToSaveInZAR")
