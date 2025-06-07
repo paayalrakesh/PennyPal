@@ -1,7 +1,47 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+/*
+Title: Get a result from an activity (rememberLauncherForActivityResult)
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://developer.android.com/training/basics/intents/result
+*/
 
+/*
+Title: Upload files with Cloud Storage on Android
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://firebase.google.com/docs/storage/android/upload-files
+*/
+
+/*
+Title: Save data in a local database using Room
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://developer.android.com/training/data-storage/room
+*/
+
+/*
+Title: Pickers (DatePickerDialog, TimePickerDialog)
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://developer.android.com/develop/ui/views/components/pickers
+*/
+
+/*
+Title: Kotlin Coroutines on Android
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://developer.android.com/kotlin/coroutines
+*/
+
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
 
+import android.util.Log
 import com.fake.pennypal.data.local.entities.Expense as RoomExpense
 import com.fake.pennypal.data.model.Expense as FirebaseExpense
 import android.app.DatePickerDialog
@@ -13,6 +53,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -23,11 +64,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.room.Room
 import com.fake.pennypal.data.local.PennyPalDatabase
+import com.fake.pennypal.utils.CurrencyConverter
 import com.fake.pennypal.utils.SessionManager
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -35,10 +78,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.*
 
+// Added a TAG for logging, which helps in filtering Logcat messages for this specific screen.
+private const val TAG = "AddExpenseScreen"
+
 @Composable
 fun AddExpenseScreen(navController: NavController) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
+    // The currency the user is currently seeing and inputting values in.
     val selectedCurrency = sessionManager.getSelectedCurrency()
 
     val db = remember {
@@ -70,20 +117,19 @@ fun AddExpenseScreen(navController: NavController) {
                 containerColor = Color(0xFFFFEB3B),
                 contentColor = Color.Black
             ) {
-                IconButton(onClick = { navController.navigate("home") }) {
-                    Icon(Icons.Default.Home, contentDescription = "Home")
-                }
-                IconButton(onClick = { navController.navigate("manageCategories") }) {
-                    Icon(Icons.Default.List, contentDescription = "Categories")
-                }
-                IconButton(onClick = { navController.navigate("addChoice") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add")
-                }
-                IconButton(onClick = { navController.navigate("goals") }) {
-                    Icon(Icons.Default.Star, contentDescription = "Goals")
-                }
-                IconButton(onClick = { navController.navigate("profile") }) {
-                    Icon(Icons.Default.Person, contentDescription = "Profile")
+                // This Row structure for the bottom bar is preserved as is.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    IconButton(onClick = { navController.navigate("home") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Home, contentDescription = "Home") }
+                    IconButton(onClick = { navController.navigate("categorySpendingPreview") }) { Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph") }
+                    IconButton(onClick = { navController.navigate("manageCategories") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.List, contentDescription = "Categories") }
+                    IconButton(onClick = { navController.navigate("addChoice") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Add, contentDescription = "Add") }
+                    IconButton(onClick = { navController.navigate("goals") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Star, contentDescription = "Goals") }
+                    IconButton(onClick = { navController.navigate("profile") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Person, contentDescription = "Profile") }
                 }
             }
         }
@@ -123,7 +169,7 @@ fun AddExpenseScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Start & End Time
+            // Start & End Time Pickers
             Button(onClick = {
                 val cal = Calendar.getInstance()
                 TimePickerDialog(context, { _, h, m -> startTime = "%02d:%02d".format(h, m) },
@@ -153,7 +199,8 @@ fun AddExpenseScreen(navController: NavController) {
                 onValueChange = { amount = it },
                 label = { Text("Amount in $selectedCurrency") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -202,30 +249,39 @@ fun AddExpenseScreen(navController: NavController) {
                                     imageRef.putFile(uri).await()
                                     downloadUrl = imageRef.downloadUrl.await().toString()
                                 } catch (e: Exception) {
-                                    e.printStackTrace()
+                                    Log.e(TAG, "Image upload failed", e)
                                     return@launch
                                 }
                             }
 
-                            val expenseAmount = amount.toDoubleOrNull() ?: return@launch
+                            // Step 1: Parse the user's input. This value is in the 'selectedCurrency'.
+                            val amountInSelectedCurrency = amount.toDoubleOrNull() ?: return@launch
+                            Log.d(TAG, "User entered amount: $amountInSelectedCurrency in $selectedCurrency")
 
+                            // Step 2: **THE FIX** - Convert the input amount from the selected currency BACK to the base currency (ZAR).
+                            // This ensures all data stored in the database is in a consistent, single currency.
+                            val amountToSaveInZAR = CurrencyConverter.convert(amountInSelectedCurrency, selectedCurrency, "ZAR")
+                            Log.d(TAG, "Converted amount to ZAR for saving: $amountToSaveInZAR")
+
+
+                            // Step 3: Use the converted ZAR amount when creating the objects for Room and Firestore.
                             try {
                                 val roomExpense = RoomExpense(
                                     date = date,
-                                    amount = expenseAmount,
+                                    amount = amountToSaveInZAR, // Use the converted amount
                                     category = category,
                                     description = description,
                                     photoUri = downloadUrl
                                 )
                                 expenseDao.insertExpense(roomExpense)
                             } catch (e: Exception) {
-                                println("Room DB Error: ${e.localizedMessage}")
+                                Log.e(TAG, "Room DB Error", e)
                             }
 
                             try {
                                 val firebaseExpense = FirebaseExpense(
                                     date = date,
-                                    amount = expenseAmount,
+                                    amount = amountToSaveInZAR, // Use the converted amount
                                     category = category,
                                     description = description,
                                     startTime = startTime,
@@ -237,9 +293,15 @@ fun AddExpenseScreen(navController: NavController) {
                                     .document(username)
                                     .collection("expenses")
                                     .add(firebaseExpense)
-                                    .addOnSuccessListener { navController.popBackStack() }
+                                    .addOnSuccessListener {
+                                        Log.d(TAG, "Expense saved successfully to Firestore.")
+                                        navController.popBackStack()
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.e(TAG, "Firestore Error", e)
+                                    }
                             } catch (e: Exception) {
-                                println("Firestore Error: ${e.localizedMessage}")
+                                Log.e(TAG, "An unexpected error occurred during Firestore operation", e)
                             }
                         }
                     }

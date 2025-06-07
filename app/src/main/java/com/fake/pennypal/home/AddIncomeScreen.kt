@@ -42,20 +42,30 @@ fun AddIncomeScreen(navController: NavController) {
                 containerColor = Color(0xFFFFEB3B),
                 contentColor = Color.Black
             ) {
-                IconButton(onClick = { navController.navigate("home") }) {
-                    Icon(Icons.Default.Home, contentDescription = "Home")
-                }
-                IconButton(onClick = { navController.navigate("manageCategories") }) {
-                    Icon(Icons.Default.List, contentDescription = "Categories")
-                }
-                IconButton(onClick = { navController.navigate("addChoice") }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add")
-                }
-                IconButton(onClick = { navController.navigate("goals") }) {
-                    Icon(Icons.Default.Star, contentDescription = "Goals")
-                }
-                IconButton(onClick = { navController.navigate("profile") }) {
-                    Icon(Icons.Default.Person, contentDescription = "Profile")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    IconButton(onClick = { navController.navigate("home") }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Home, contentDescription = "Home")
+                    }
+                    IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
+                        Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph")
+                    }
+                    IconButton(onClick = { navController.navigate("manageCategories") }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.List, contentDescription = "Categories")
+                    }
+                    IconButton(onClick = { navController.navigate("addChoice") }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Add, contentDescription = "Add")
+                    }
+                    IconButton(onClick = { navController.navigate("goals") }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Star, contentDescription = "Goals")
+                    }
+                    IconButton(onClick = { navController.navigate("profile") }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Person, contentDescription = "Profile")
+                    }
                 }
             }
         }
