@@ -1,66 +1,19 @@
 /*
-Title: Side-effects in Jetpack Compose (LaunchedEffect)
+Title: Get real-time updates with Cloud Firestore
 Author: Google
 Date: 2023
 Code version: N/A
-Availability: https://developer.android.com/jetpack/compose/side-effects#launchedeffect
+Availability: https://firebase.google.com/docs/firestore/query-data/listen
 */
 
 /*
-Title: State and Jetpack Compose (remember, mutableStateOf)
+Title: Side-effects in Jetpack Compose (DisposableEffect, LaunchedEffect)
 Author: Google
 Date: 2023
 Code version: N/A
-Availability: https://developer.android.com/jetpack/compose/state
+Availability: https://developer.android.com/jetpack/compose/side-effects
 */
 
-/*
-Title: Get data with Cloud Firestore | Kotlin+KTX
-Author: Google
-Date: 2023
-Code version: N/A
-Availability: https://firebase.google.com/docs/firestore/query-data/get-data
-*/
-
-/*
-Title: Kotlin collection transformations (groupBy, mapValues, sumOf)
-Author: JetBrains
-Date: 2023
-Code version: 1.9
-Availability: https://kotlinlang.org/docs/collection-transformations.html
-*/
-
-/*
-Title: Layouts in Jetpack Compose (Column, Row, Box)
-Author: Google
-Date: 2023
-Code version: N/A
-Availability: https://developer.android.com/jetpack/compose/layouts/basics
-*/
-
-/*
-Title: Material Components for Compose (Card, Scaffold, Button)
-Author: Google
-Date: 2023
-Code version: N/A
-Availability: https://developer.android.com/jetpack/compose/components
-*/
-
-/*
-Title: Coil - Image loading for Android (rememberAsyncImagePainter)
-Author: Coil Contributors
-Date: 2023
-Code version: 2.4.0
-Availability: https://coil-kt.github.io/coil/compose/
-*/
-
-/*
-Title: SimpleDateFormat
-Author: Oracle
-Date: 2023
-Code version: Java 11
-Availability: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/text/SimpleDateFormat.html
-*/
 
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
@@ -88,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
+import com.fake.pennypal.data.model.Income // **FIX**: Added missing import for Income model
 import com.google.firebase.firestore.FirebaseFirestore
 import com.fake.pennypal.utils.getCurrentUsername
 import com.fake.pennypal.utils.SessionManager
@@ -95,11 +49,11 @@ import com.fake.pennypal.utils.CurrencyConverter
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.rememberAsyncImagePainter
+import com.google.firebase.firestore.ktx.toObject
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Added a TAG for logging, which helps in filtering Logcat messages for this specific screen.
 private const val TAG = "CategorySpendingScreen"
 
 @Composable
@@ -108,7 +62,6 @@ fun CurrencyDropdown(
     onSelected: (String) -> Unit
 ) {
     val options = CurrencyConverter.getAvailableCurrencies()
-    // FIX: Corrected the typo from "mutableState of" to "mutableStateOf"
     var expanded by remember { mutableStateOf(false) }
 
     Box {
@@ -119,11 +72,11 @@ fun CurrencyDropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-            options.forEach {
+            options.forEach { currency ->
                 DropdownMenuItem(
-                    text = { Text(it) },
+                    text = { Text(currency) },
                     onClick = {
-                        onSelected(it)
+                        onSelected(currency)
                         expanded = false
                     }
                 )
@@ -131,6 +84,7 @@ fun CurrencyDropdown(
         }
     }
 }
+
 
 @Composable
 fun CategorySpendingPreviewScreen(navController: NavController) {
@@ -140,113 +94,90 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
     val sessionManager = remember { SessionManager(context) }
     var selectedCurrency by remember { mutableStateOf(sessionManager.getSelectedCurrency()) }
     var selectedFilter by remember { mutableStateOf("Monthly") }
-    var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
 
-    // FIX: Renamed state variables to clarify that they hold values converted to the selected currency.
-    // This avoids confusion with the original ZAR values fetched from Firestore.
+    // --- State for calculated data ---
+    var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
+    var recentExpensesGrouped by remember { mutableStateOf<Map<String, List<Expense>>>(emptyMap()) }
     var minGoalConverted by remember { mutableStateOf(0.0) }
     var maxGoalConverted by remember { mutableStateOf(20000.0) }
+    var trueBalance by remember { mutableStateOf(0.0) }
 
-    var recentExpensesGrouped by remember { mutableStateOf<Map<String, List<Expense>>>(emptyMap()) }
+    // --- State for raw real-time data from Firestore ---
+    var allExpenses by remember { mutableStateOf(listOf<Expense>()) }
+    var allIncomes by remember { mutableStateOf(listOf<Income>()) }
 
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    // This LaunchedEffect will re-run whenever the 'selectedFilter' or 'selectedCurrency' changes.
-    // It's the correct place for fetching and processing data based on these user-selected states.
-    LaunchedEffect(selectedFilter, selectedCurrency) {
-        if (username.isEmpty()) return@LaunchedEffect
+    // --- EFFECT 1: REAL-TIME LISTENERS ---
+    DisposableEffect(username) {
+        if (username.isBlank()) { onDispose {} }
 
-        Log.d(TAG, "LaunchedEffect triggered. Filter: $selectedFilter, Currency: $selectedCurrency")
-
-        val (start, end) = getDateRange(selectedFilter)
-
-        val expenses = db.collection("users").document(username).collection("expenses").get().await()
-            .mapNotNull { it.toObject(Expense::class.java) }
-            .filter {
-                val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
-                parsedDate != null && parsedDate in start..end
+        Log.d(TAG, "Setting up real-time listeners for user: $username")
+        val expensesListener = db.collection("users").document(username).collection("expenses")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { Log.e(TAG, "Expense listener failed.", error); return@addSnapshotListener }
+                if (snapshot != null) {
+                    allExpenses = snapshot.documents.mapNotNull { it.toObject(Expense::class.java) }
+                    Log.d(TAG, "Real-time update: ${allExpenses.size} expenses")
+                }
             }
 
-        val recentExpensesByCategory = expenses.groupBy { it.category }
-            .mapValues { it.value.sortedByDescending { it.date }.take(3) }
-        recentExpensesGrouped = recentExpensesByCategory
+        val incomesListener = db.collection("users").document(username).collection("incomes")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) { Log.e(TAG, "Income listener failed.", error); return@addSnapshotListener }
+                if (snapshot != null) {
+                    allIncomes = snapshot.documents.mapNotNull { it.toObject(Income::class.java) }
+                    Log.d(TAG, "Real-time update: ${allIncomes.size} incomes")
+                }
+            }
 
-        // Group expenses by category and sum their amounts. This sum is initially in the base currency (ZAR).
-        val groupedInZAR = expenses.groupBy { it.category }
-            .mapValues { entry -> entry.value.sumOf { it.amount } }
-
-        // Convert the ZAR totals to the user's selected currency.
-        val converted = groupedInZAR.mapValues { (_, amount) ->
-            CurrencyConverter.convert(amount, "ZAR", selectedCurrency)
-        }
-        categoryTotals = converted
-        val totalSpent = converted.values.sum()
-        Log.d(TAG, "Total spent in $selectedCurrency: $totalSpent")
-
-        // Fetch goals from Firestore. These are stored in the base currency (ZAR).
-        val goals = db.collection("users").document(username)
-            .collection("goals").document("default").get().await().data
-
-        val minGoalZAR: Double
-        val maxGoalZAR: Double
-
-        if (goals != null) {
-            minGoalZAR = (goals["minSpendingGoal"] as? Number)?.toDouble() ?: 0.0
-            maxGoalZAR = (goals["spendingLimit"] as? Number)?.toDouble() ?: 20000.0
-        } else {
-            minGoalZAR = 0.0
-            maxGoalZAR = 20000.0
-        }
-        Log.d(TAG, "Fetched Goals in ZAR -> Min: $minGoalZAR, Max: $maxGoalZAR")
-
-        // FIX: Convert the ZAR goal values to the selected currency before using them in calculations.
-        // This ensures all comparisons and calculations are done in the same currency.
-        minGoalConverted = CurrencyConverter.convert(minGoalZAR, "ZAR", selectedCurrency)
-        maxGoalConverted = CurrencyConverter.convert(maxGoalZAR, "ZAR", selectedCurrency)
-        Log.d(TAG, "Converted Goals in $selectedCurrency -> Min: $minGoalConverted, Max: $maxGoalConverted")
-
-
-        val badgeCollection = db.collection("users").document(username).collection("badges")
-        // Note: Badge logic should ideally use the base currency values to remain consistent,
-        // as the goals are stored in ZAR in the database.
-        val totalSpentZAR = groupedInZAR.values.sum()
-        if (totalSpentZAR <= maxGoalZAR) {
-            val badge = hashMapOf(
-                "title" to "Budget Keeper",
-                "description" to "You stayed under your spending limit!",
-                "earnedDate" to formatter.format(Date())
-            )
-            // badgeCollection.add(badge) // Uncomment to enable badge creation
-        }
-
-        val balanceZAR = maxGoalZAR - totalSpentZAR
-        if (balanceZAR >= minGoalZAR) {
-            val badge = hashMapOf(
-                "title" to "Savings Star",
-                "description" to "You saved more than your minimum goal!",
-                "earnedDate" to formatter.format(Date())
-            )
-            // badgeCollection.add(badge) // Uncomment to enable badge creation
+        onDispose {
+            Log.d(TAG, "Removing listeners.")
+            expensesListener.remove()
+            incomesListener.remove()
         }
     }
 
-    val totalSpent = categoryTotals.values.sum()
-    // FIX: Calculate goal progress using the CONVERTED max goal value.
-    val goalProgress = if (maxGoalConverted > 0) (totalSpent / maxGoalConverted).coerceIn(0.0, 1.0) else 0.0
+    // --- EFFECT 2: DATA PROCESSOR & CALCULATOR ---
+    LaunchedEffect(allExpenses, allIncomes, selectedFilter, selectedCurrency) {
+        Log.d(TAG, "Processing data...")
 
-    LaunchedEffect(goalProgress) {
-        if (goalProgress < 1.0) {
-            val badge = com.fake.pennypal.data.model.Badge(
-                title = "Budget Master!",
-                description = "You stayed under your monthly spending goal.",
-                earnedDate = formatter.format(Date())
-            )
-//            db.collection("users").document(username)
-//                .collection("badges")
-//                .document("badge_budget_master")
-//                .set(badge) // Uncomment to enable badge creation
+        val totalIncomeZAR = allIncomes.sumOf { it.amount }
+        val totalExpensesZAR = allExpenses.sumOf { it.amount }
+        val trueBalanceZAR = totalIncomeZAR - totalExpensesZAR
+        trueBalance = CurrencyConverter.convert(trueBalanceZAR, "ZAR", selectedCurrency)
+        Log.d(TAG, "Calculated True Balance: $trueBalance $selectedCurrency")
+
+        val (start, end) = getDateRange(selectedFilter)
+        val filteredExpenses = allExpenses.filter {
+            val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
+            parsedDate != null && parsedDate in start..end
+        }
+        recentExpensesGrouped = filteredExpenses.groupBy { it.category }
+            .mapValues { it.value.sortedByDescending { exp -> exp.date }.take(3) }
+        val totalsInZAR = filteredExpenses.groupBy { it.category }
+            .mapValues { entry -> entry.value.sumOf { exp -> exp.amount } }
+        categoryTotals = totalsInZAR.mapValues { (_, total) ->
+            CurrencyConverter.convert(total, "ZAR", selectedCurrency)
         }
     }
+
+    // --- EFFECT 3: GOAL FETCHER ---
+    LaunchedEffect(username, selectedCurrency) {
+        if (username.isBlank()) return@LaunchedEffect
+        try {
+            val goals = db.collection("users").document(username).collection("goals").document("default").get().await().data
+            val minGoalZAR = (goals?.get("minSpendingGoal") as? Number)?.toDouble() ?: 0.0
+            val maxGoalZAR = (goals?.get("spendingLimit") as? Number)?.toDouble() ?: 20000.0
+            minGoalConverted = CurrencyConverter.convert(minGoalZAR, "ZAR", selectedCurrency)
+            maxGoalConverted = CurrencyConverter.convert(maxGoalZAR, "ZAR", selectedCurrency)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch goals", e)
+        }
+    }
+
+    val totalSpentInPeriod = categoryTotals.values.sum()
+    val goalProgress = if (maxGoalConverted > 0) (totalSpentInPeriod / maxGoalConverted).coerceIn(0.0, 1.0) else 0.0
 
     Scaffold(
         topBar = {
@@ -261,44 +192,23 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         },
         containerColor = Color(0xFFFFFDE7),
         bottomBar = {
-            NavigationBar(
-                containerColor = Color(0xFFFFEB3B),
-                contentColor = Color.Black
-            ) {
+            NavigationBar(containerColor = Color(0xFFFFEB3B), contentColor = Color.Black) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    IconButton(onClick = { navController.navigate("home") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Home, contentDescription = "Home")
-                    }
-                    IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
-                        Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph")
-                    }
-                    IconButton(onClick = { navController.navigate("manageCategories") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.List, contentDescription = "Categories")
-                    }
-                    IconButton(onClick = { navController.navigate("addChoice") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Add, contentDescription = "Add")
-                    }
-                    IconButton(onClick = { navController.navigate("goals") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Star, contentDescription = "Goals")
-                    }
-                    IconButton(onClick = { navController.navigate("profile") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Person, contentDescription = "Profile")
-                    }
+                    IconButton(onClick = { navController.navigate("home") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Home, contentDescription = "Home") }
+                    IconButton(onClick = { navController.navigate("categorySpendingPreview") }) { Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph") }
+                    IconButton(onClick = { navController.navigate("manageCategories") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.List, contentDescription = "Categories") }
+                    IconButton(onClick = { navController.navigate("addChoice") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Add, contentDescription = "Add") }
+                    IconButton(onClick = { navController.navigate("goals") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Star, contentDescription = "Goals") }
+                    IconButton(onClick = { navController.navigate("profile") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Person, contentDescription = "Profile") }
                 }
             }
         }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             CurrencyDropdown(selectedCurrency) { newCurrency ->
@@ -306,11 +216,9 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 sessionManager.setSelectedCurrency(newCurrency)
             }
 
-            // FIX: Calculate the balance using the CONVERTED max goal value.
-            val balance = maxGoalConverted - totalSpent
-            val hasExpenses = totalSpent > 0
+            val hasTransactions = allIncomes.isNotEmpty() || allExpenses.isNotEmpty()
 
-            if (hasExpenses) {
+            if (hasTransactions) {
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -318,9 +226,16 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Total Balance", fontSize = 14.sp)
-                        Text("$selectedCurrency ${"%.2f".format(balance)}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "$selectedCurrency ${"%.2f".format(trueBalance)}",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Total Expense: $selectedCurrency ${"%.2f".format(totalSpent)}", color = Color.Red)
+                        Text(
+                            "${selectedFilter} Expense: $selectedCurrency ${"%.2f".format(totalSpentInPeriod)}",
+                            color = Color.Red
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Goal Progress")
                         LinearProgressIndicator(
@@ -332,11 +247,10 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                     }
                 }
             } else {
-                Text("No expenses available for this period.", color = Color.Gray, fontSize = 14.sp)
+                Text("No transactions found.", color = Color.Gray, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-
             LazyRow(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -355,18 +269,12 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(16.dp))
-
-            // FIX: Pass the CONVERTED goal values to the BarChart composable.
             BarChartWithGoals(categoryTotals, minGoalConverted, maxGoalConverted, selectedCurrency)
-
             Spacer(modifier = Modifier.height(24.dp))
             Text("Recent Expenses", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-
             recentExpensesGrouped.forEach { (category, items) ->
                 Text(category, fontWeight = FontWeight.Medium, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
-
                 items.forEach { expense ->
                     Card(
                         shape = RoundedCornerShape(12.dp),
@@ -375,7 +283,6 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clickable {
-                                // The individual expense amount is correctly converted on the fly below.
                                 navController.navigate(
                                     "expenseDetail/${expense.date}/${expense.amount}/${expense.category}/${expense.description}/${expense.photoUrl}/${selectedCurrency}"
                                 )
@@ -386,7 +293,6 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                             val convertedAmount = CurrencyConverter.convert(expense.amount, "ZAR", selectedCurrency)
                             Text("Amount: $selectedCurrency ${"%.2f".format(convertedAmount)}", fontSize = 12.sp)
                             Text("Description: ${expense.description}", fontSize = 12.sp)
-
                             if (!expense.photoUrl.isNullOrEmpty()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Image(
@@ -403,8 +309,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(100.dp)) // Final bottom padding
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }
@@ -417,54 +322,29 @@ fun BarChartWithGoals(
     maxGoal: Double,
     currency: String
 ) {
-    // All values passed into this composable (categoryTotals, minGoal, maxGoal) are now in the same currency.
     val maxAmount = (categoryTotals.values.maxOrNull() ?: 1.0).coerceAtLeast(maxGoal)
-    val barColor = Color(0xFFAED581) // Pastel green
-    val backgroundColor = Color(0xFFF3FCEB) // Light card background
+    val barColor = Color(0xFFAED581)
+    val backgroundColor = Color(0xFFF3FCEB)
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(260.dp),
+        modifier = Modifier.fillMaxWidth().height(260.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "Income & Expenses",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                color = Color(0xFF2E7D32) // Dark green title
-            )
-
+            Text(text = "Income & Expenses", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Color(0xFF2E7D32))
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
+                modifier = Modifier.fillMaxWidth().height(160.dp)
             ) {
-                // Draw horizontal axis lines (optional styling)
                 repeat(4) { i ->
                     val y = 40.dp * i
-                    Divider(
-                        color = Color.LightGray,
-                        thickness = 1.dp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopStart)
-                            .offset(y = y)
-                    )
+                    Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.fillMaxWidth().align(Alignment.TopStart).offset(y = y))
                 }
-
-                // Bars
                 Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 12.dp, bottom = 8.dp),
+                    modifier = Modifier.fillMaxSize().padding(top = 12.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Bottom
                 ) {
@@ -475,20 +355,13 @@ fun BarChartWithGoals(
                             verticalArrangement = Arrangement.Bottom,
                             modifier = Modifier.height(140.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(16.dp)
-                                    .height((heightRatio * 100).dp)
-                                    .background(barColor, shape = RoundedCornerShape(8.dp))
-                            )
+                            Box(modifier = Modifier.width(16.dp).height((heightRatio * 100).dp).background(barColor, shape = RoundedCornerShape(8.dp)))
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(category.take(3), fontSize = 10.sp, color = Color.DarkGray)
                         }
                     }
                 }
             }
-
-            // Optional: goal line info
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -499,4 +372,3 @@ fun BarChartWithGoals(
         }
     }
 }
-

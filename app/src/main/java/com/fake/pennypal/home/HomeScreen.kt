@@ -1,7 +1,23 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+/*
+Title: Get real-time updates with Cloud Firestore
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://firebase.google.com/docs/firestore/query-data/listen
+*/
 
+/*
+Title: Side-effects in Jetpack Compose (DisposableEffect)
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://developer.android.com/jetpack/compose/side-effects#disposableeffect
+*/
+
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,7 +42,9 @@ import com.fake.pennypal.data.model.Income
 import com.fake.pennypal.utils.SessionManager
 import com.fake.pennypal.utils.CurrencyConverter
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.ktx.toObject
+
+private const val TAG = "HomeScreen"
 
 @Composable
 fun HomeScreen(navController: NavController) {
@@ -38,15 +56,49 @@ fun HomeScreen(navController: NavController) {
     var incomeList by remember { mutableStateOf(emptyList<Income>()) }
     var expenseList by remember { mutableStateOf(emptyList<Expense>()) }
 
-    LaunchedEffect(Unit) {
-        val db = FirebaseFirestore.getInstance()
-        val incomes = db.collection("users").document(username).collection("incomes").get().await()
-            .mapNotNull { it.toObject(Income::class.java) }
-        val expenses = db.collection("users").document(username).collection("expenses").get().await()
-            .mapNotNull { it.toObject(Expense::class.java) }
+    // CHANGE: Switched from LaunchedEffect to DisposableEffect to handle real-time listeners.
+    // This effect will run when the screen is first composed and will clean up when it's disposed.
+    DisposableEffect(username) {
+        if (username.isBlank()) {
+            return@DisposableEffect onDispose { }
+        }
 
-        incomeList = incomes
-        expenseList = expenses
+        val db = FirebaseFirestore.getInstance()
+
+        // Listener for Incomes
+        val incomeListener = db.collection("users").document(username).collection("incomes")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Income listener failed.", error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val incomes = snapshot.documents.mapNotNull { it.toObject(Income::class.java) }
+                    incomeList = incomes
+                    Log.d(TAG, "Income data updated in real-time. Count: ${incomes.size}")
+                }
+            }
+
+        // Listener for Expenses
+        val expenseListener = db.collection("users").document(username).collection("expenses")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Expense listener failed.", error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val expenses = snapshot.documents.mapNotNull { it.toObject(Expense::class.java) }
+                    expenseList = expenses
+                    Log.d(TAG, "Expense data updated in real-time. Count: ${expenses.size}")
+                }
+            }
+
+        // onDispose is the cleanup block. It's called when the composable leaves the screen.
+        // We remove the listeners here to prevent memory leaks and unnecessary background work.
+        onDispose {
+            incomeListener.remove()
+            expenseListener.remove()
+        }
     }
 
     val totalIncomeZAR = incomeList.sumOf { it.amount }
@@ -61,140 +113,61 @@ fun HomeScreen(navController: NavController) {
 
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = Color(0xFFFFEB3B),
-                contentColor = Color.Black
-            ) {
+            NavigationBar(containerColor = Color(0xFFFFEB3B), contentColor = Color.Black) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    IconButton(onClick = { navController.navigate("home") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Home, contentDescription = "Home")
-                    }
-                    IconButton(onClick = { navController.navigate("categorySpendingPreview") }) {
-                        Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph")
-                    }
-                    IconButton(onClick = { navController.navigate("manageCategories") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.List, contentDescription = "Categories")
-                    }
-                    IconButton(onClick = { navController.navigate("addChoice") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Add, contentDescription = "Add")
-                    }
-                    IconButton(onClick = { navController.navigate("goals") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Star, contentDescription = "Goals")
-                    }
-                    IconButton(onClick = { navController.navigate("profile") }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.Person, contentDescription = "Profile")
-                    }
+                    IconButton(onClick = { navController.navigate("home") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Home, contentDescription = "Home") }
+                    IconButton(onClick = { navController.navigate("categorySpendingPreview") }) { Icon(Icons.Default.BarChart, contentDescription = "Category Spending Graph") }
+                    IconButton(onClick = { navController.navigate("manageCategories") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.List, contentDescription = "Categories") }
+                    IconButton(onClick = { navController.navigate("addChoice") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Add, contentDescription = "Add") }
+                    IconButton(onClick = { navController.navigate("goals") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Star, contentDescription = "Goals") }
+                    IconButton(onClick = { navController.navigate("profile") }, modifier = Modifier.weight(1f)) { Icon(Icons.Default.Person, contentDescription = "Profile") }
                 }
             }
         }
     ) { paddingValues ->
-
+        // The rest of your UI remains exactly the same.
         Column(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .background(Color(0xFFF1F8E9))
-                .padding(16.dp)
+            modifier = Modifier.padding(paddingValues).fillMaxSize().verticalScroll(rememberScrollState()).background(Color(0xFFF1F8E9)).padding(16.dp)
         ) {
-            Text(
-                text = "Hi, Welcome Back",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF388E3C)
-            )
-
+            Text(text = "Hi, Welcome Back", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF388E3C))
             Spacer(modifier = Modifier.height(12.dp))
-
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
+                modifier = Modifier.fillMaxWidth().wrapContentHeight()
             ) {
-                Column(
-                    modifier = Modifier
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Total Balance: $selectedCurrency ${"%.2f".format(balance)}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                    Text(
-                        text = "Total Income: $selectedCurrency ${"%.2f".format(totalIncome)}",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = Color(0xFF2E7D32)
-                    )
-                    Text(
-                        text = "Total Expenses: -$selectedCurrency ${"%.2f".format(totalExpenses)}",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = Color.Red
-                    )
-                    LinearProgressIndicator(
-                        progress = progress,
-                        color = Color(0xFF388E3C),
-                        trackColor = Color.LightGray,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                    )
-                    Text(
-                        text = "${(progress * 100).toInt()}% of your income spent",
-                        fontSize = 12.sp
-                    )
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "Total Balance: $selectedCurrency ${"%.2f".format(balance)}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(text = "Total Income: $selectedCurrency ${"%.2f".format(totalIncome)}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Color(0xFF2E7D32))
+                    Text(text = "Total Expenses: -$selectedCurrency ${"%.2f".format(totalExpenses)}", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Color.Red)
+                    LinearProgressIndicator(progress = progress, color = Color(0xFF388E3C), trackColor = Color.LightGray, modifier = Modifier.fillMaxWidth().height(8.dp))
+                    Text(text = "${(progress * 100).toInt()}% of your income spent", fontSize = 12.sp)
                 }
             }
-
             Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Recent Transactions",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-
+            Text(text = "Recent Transactions", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Manually render items because LazyColumn + verticalScroll don't work together
             expenseList.forEach { expense ->
                 val convertedAmount = CurrencyConverter.convert(expense.amount, "ZAR", selectedCurrency)
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
                             Text(expense.category, fontWeight = FontWeight.Bold)
                             Text(expense.description, fontSize = 12.sp)
                         }
-                        Text(
-                            text = "$selectedCurrency ${"%.2f".format(convertedAmount)}",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = "$selectedCurrency ${"%.2f".format(convertedAmount)}", fontWeight = FontWeight.Bold)
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(80.dp)) // Prevent bottom nav from overlapping content
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }

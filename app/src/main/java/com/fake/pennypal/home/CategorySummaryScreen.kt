@@ -1,6 +1,39 @@
+/*
+Title: Lists in Compose (LazyColumn, LazyRow)
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://developer.android.com/jetpack/compose/lists
+*/
+
+/*
+Title: Side-effects in Jetpack Compose (LaunchedEffect)
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://developer.android.com/jetpack/compose/side-effects#launchedeffect
+*/
+
+/*
+Title: Get data with Cloud Firestore | Kotlin+KTX
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://firebase.google.com/docs/firestore/query-data/get-data
+*/
+
+/*
+Title: Kotlin collection transformations (groupBy, mapValues, sumOf)
+Author: JetBrains
+Date: 2023
+Code version: 1.9
+Availability: https://kotlinlang.org/docs/collection-transformations.html
+*/
+
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,26 +54,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
+import com.fake.pennypal.utils.CurrencyConverter
 import com.fake.pennypal.utils.SessionManager
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
+// Added a TAG for logging, which helps in filtering Logcat messages for this specific screen.
+private const val TAG = "CategorySummaryScreen"
+
 @Composable
 fun CategorySummaryScreen(navController: NavController) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val username = sessionManager.getLoggedInUser() ?: ""
+    // Step 1: Get the currently selected currency.
+    val selectedCurrency = sessionManager.getSelectedCurrency()
     val db = FirebaseFirestore.getInstance()
 
     var selectedFilter by remember { mutableStateOf("Monthly") }
+    // This state will now hold the category totals ALREADY CONVERTED to the selected currency.
     var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
 
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    LaunchedEffect(selectedFilter) {
+    // Step 2: The LaunchedEffect now re-runs if the filter OR the currency changes.
+    LaunchedEffect(selectedFilter, selectedCurrency) {
         if (username.isEmpty()) return@LaunchedEffect
+        Log.d(TAG, "LaunchedEffect triggered. Filter: $selectedFilter, Currency: $selectedCurrency")
 
         val (start, end) = getDateRange(selectedFilter)
 
@@ -54,8 +96,15 @@ fun CategorySummaryScreen(navController: NavController) {
                 parsedDate != null && parsedDate in start..end
             }
 
-        categoryTotals = expenses.groupBy { it.category }
+        // First, group and sum the expenses in their base currency (ZAR).
+        val totalsInZAR = expenses.groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
+
+        // Step 3: Convert the ZAR totals to the selected currency before updating the state.
+        categoryTotals = totalsInZAR.mapValues { (_, totalZAR) ->
+            CurrencyConverter.convert(totalZAR, "ZAR", selectedCurrency)
+        }
+        Log.d(TAG, "Converted category totals for display: $categoryTotals")
     }
 
     Scaffold(
@@ -102,7 +151,12 @@ fun CategorySummaryScreen(navController: NavController) {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(category, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                            Text("R${"%.2f".format(total)}", fontSize = 18.sp, color = Color(0xFFD32F2F))
+                            // Step 4: Display the dynamic currency symbol and the converted total.
+                            Text(
+                                text = "$selectedCurrency${"%.2f".format(total)}",
+                                fontSize = 18.sp,
+                                color = Color(0xFFD32F2F)
+                            )
                         }
                     }
                 }
@@ -110,6 +164,12 @@ fun CategorySummaryScreen(navController: NavController) {
         }
     }
 }
+
+/**
+ * A reusable composable for the filter button row.
+ * @param selected The currently selected filter string.
+ * @param onFilterSelected Callback invoked when a filter button is clicked.
+ */
 @Composable
 fun FilterRow(selected: String, onFilterSelected: (String) -> Unit) {
     val filters = listOf("Daily", "Weekly", "Monthly", "Yearly")
@@ -134,4 +194,3 @@ fun FilterRow(selected: String, onFilterSelected: (String) -> Unit) {
         }
     }
 }
-
