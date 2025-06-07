@@ -8,8 +8,7 @@ on:
   push:
     branches:
       - 'master'
-    types:
-      - closed  # Ensures it only runs when the PR is merged (not just opened)
+      
   # Allows you to manually trigger this workflow from the GitHub Actions tab
   workflow_dispatch:
 jobs:
