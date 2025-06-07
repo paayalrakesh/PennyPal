@@ -23,11 +23,20 @@ Availability: https://developer.android.com/jetpack/compose/layouts/basics#image
 */
 
 /*
-Title: Side-effects in Jetpack Compose (LaunchedEffect)
+Title: Side-effects in Jetpack Compose (LaunchedEffect, DisposableEffect)
 Author: Google
 Date: 2023
 Code version: N/A
-Availability: https://developer.android.com/jetpack/compose/side-effects#launchedeffect
+Availability: https://developer.android.com/jetpack/compose/side-effects
+*/
+
+/*
+Title: Get real-time updates with Cloud Firestore
+Description: Official Firebase documentation explaining how to use addSnapshotListener to listen for data changes in real time, including with queries.
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://firebase.google.com/docs/firestore/query-data/listen
 */
 
 /*
@@ -88,28 +97,65 @@ fun CategoryExpensesScreen(navController: NavController, categoryName: String) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val selectedCurrency = sessionManager.getSelectedCurrency()
+    val username = sessionManager.getLoggedInUser() ?: ""
+
     var selectedFilter by remember { mutableStateOf("Monthly") }
+    // This state will hold the final, filtered list of expenses to be displayed in the UI.
     var expenses by remember { mutableStateOf(listOf<Expense>()) }
+
+    // NEW: This state holds the raw, unfiltered list of expenses for the category from the real-time listener.
+    var allCategoryExpenses by remember { mutableStateOf(listOf<Expense>()) }
+
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    // This side-effect fetches expenses from Firestore whenever the filter or category changes.
-    LaunchedEffect(selectedFilter, categoryName) {
-        val (start, end) = getDateRange(selectedFilter)
-        val username = SessionManager(context).getLoggedInUser() ?: return@LaunchedEffect
-        Log.d(TAG, "Fetching expenses for category '$categoryName' with filter '$selectedFilter'")
+    // NEW: A DisposableEffect sets up a real-time listener for expenses in the specific category.
+    // It attaches when the screen appears and detaches when it's left, preventing memory leaks.
+    // Ref: https://developer.android.com/jetpack/compose/side-effects#disposableeffect
+    DisposableEffect(username, categoryName) {
+        if (username.isEmpty()) {
+            onDispose { } // Do nothing if there's no user.
+        }
 
-        val fetchedExpenses = db.collection("users").document(username)
+        Log.d(TAG, "Setting up real-time listener for category: '$categoryName'")
+
+        // The listener queries for expenses matching the category and listens for any changes.
+        // Ref: https://firebase.google.com/docs/firestore/query-data/listen
+        val listener = db.collection("users").document(username)
             .collection("expenses")
             .whereEqualTo("category", categoryName) // Query by category
-            .get().await()
-            .mapNotNull { it.toObject(Expense::class.java) }
-            .filter { // Filter by date range locally
-                val date = try { formatter.parse(it.date) } catch (e: Exception) { null }
-                date != null && date >= start && date <= end
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Listener for category '$categoryName' failed.", error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    // When new data arrives, update the raw list of expenses.
+                    allCategoryExpenses = snapshot.toObjects(Expense::class.java)
+                    Log.d(TAG, "Live data received. Found ${allCategoryExpenses.size} total expenses for category '$categoryName'.")
+                }
             }
 
-        expenses = fetchedExpenses
-        Log.d(TAG, "Found ${fetchedExpenses.size} expenses.")
+        // The onDispose block is crucial for cleanup when the screen is navigated away from.
+        onDispose {
+            Log.d(TAG, "Removing listener for category: '$categoryName'")
+            listener.remove()
+        }
+    }
+
+    // MODIFIED: This side-effect now processes the data from the listener instead of fetching it.
+    // It runs whenever the raw data (allCategoryExpenses) or the filter changes.
+    LaunchedEffect(allCategoryExpenses, selectedFilter) {
+        Log.d(TAG, "Processing ${allCategoryExpenses.size} expenses with filter '$selectedFilter'")
+        val (start, end) = getDateRange(selectedFilter)
+
+        // Filter the live list of expenses by date range locally.
+        val filteredExpenses = allCategoryExpenses.filter {
+            val date = try { formatter.parse(it.date) } catch (e: Exception) { null }
+            date != null && date >= start && date <= end
+        }
+
+        expenses = filteredExpenses
+        Log.d(TAG, "UI updated with ${expenses.size} filtered expenses.")
     }
 
     Scaffold(
@@ -188,8 +234,9 @@ fun ExpenseCard(expense: Expense, selectedCurrency: String) {
             if (!expense.photoUrl.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Log.d(TAG, "Loading image from URL: ${expense.photoUrl}")
+                // CORRECTED: The function name is rememberAsyncImagePainter (with a capital P).
                 // The Image composable uses Coil's painter to asynchronously load the image from the URL.
-                // Passing the string URL directly to the model is the most robust way.
+                // Ref: https://coil-kt.github.io/coil/compose/
                 Image(
                     painter = rememberAsyncImagePainter(model = expense.photoUrl),
                     contentDescription = "Expense Photo for ${expense.description}",
@@ -237,18 +284,30 @@ fun CFilterRow(selected: String, onFilterSelected: (String) -> Unit) {
 
 /**
  * A helper function to calculate a start and end date based on a filter string.
+ * This version sets the time to the very start and end of the day for accurate filtering.
  * @param filter The string representing the desired period ("Daily", "Weekly", etc.).
  * @return A Pair of Date objects representing the start and end of the period.
  */
 fun getDateRange(filter: String): Pair<Date, Date> {
     val now = Calendar.getInstance()
-    val end = now.time
+    // Clone 'now' for the end date to avoid modification, and set time to end of day.
+    val end = (now.clone() as Calendar).apply {
+        set(Calendar.HOUR_OF_DAY, 23)
+        set(Calendar.MINUTE, 59)
+        set(Calendar.SECOND, 59)
+    }.time
+
     val start = Calendar.getInstance()
     when (filter) {
-        "Daily" -> start.add(Calendar.DAY_OF_YEAR, -1)
-        "Weekly" -> start.add(Calendar.DAY_OF_YEAR, -7)
+        "Daily" -> start.add(Calendar.DAY_OF_YEAR, 0) // Just today
+        "Weekly" -> start.add(Calendar.DAY_OF_YEAR, -6) // Last 7 days including today
         "Monthly" -> start.add(Calendar.MONTH, -1)
         "Yearly" -> start.add(Calendar.YEAR, -1)
     }
+    // Set start time to beginning of the day for accurate filtering.
+    start.set(Calendar.HOUR_OF_DAY, 0)
+    start.set(Calendar.MINUTE, 0)
+    start.set(Calendar.SECOND, 0)
+
     return start.time to end
 }

@@ -11,5 +11,5 @@ data class Expense(
     var description: String = "",
     var startTime: String = "",
     var endTime: String = "",
-    var photoUrl: String? = null
+    var photoUrl: String = ""
 )

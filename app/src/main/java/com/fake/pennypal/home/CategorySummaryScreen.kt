@@ -7,19 +7,29 @@ Availability: https://developer.android.com/jetpack/compose/lists
 */
 
 /*
-Title: Side-effects in Jetpack Compose (LaunchedEffect)
+Title: Side-effects in Jetpack Compose (LaunchedEffect, DisposableEffect)
 Author: Google
 Date: 2023
 Code version: N/A
-Availability: https://developer.android.com/jetpack/compose/side-effects#launchedeffect
+Availability: https://developer.android.com/jetpack/compose/side-effects
 */
 
 /*
-Title: Get data with Cloud Firestore | Kotlin+KTX
+Title: Get real-time updates with Cloud Firestore
+Description: Official Firebase documentation explaining how to use addSnapshotListener to listen for data changes in real time.
 Author: Google
 Date: 2023
 Code version: N/A
-Availability: https://firebase.google.com/docs/firestore/query-data/get-data
+Availability: https://firebase.google.com/docs/firestore/query-data/listen
+*/
+
+/*
+Title: Map custom objects (Firebase)
+Description: Documentation explaining how to map Firestore documents to custom Kotlin data classes using toObject().
+Author: Google
+Date: 2023
+Code version: N/A
+Availability: https://firebase.google.com/docs/firestore/query-data/get-data#custom_objects
 */
 
 /*
@@ -29,6 +39,7 @@ Date: 2023
 Code version: 1.9
 Availability: https://kotlinlang.org/docs/collection-transformations.html
 */
+
 
 @file:OptIn(ExperimentalMaterial3Api::class)
 package com.fake.pennypal.home
@@ -69,42 +80,73 @@ fun CategorySummaryScreen(navController: NavController) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val username = sessionManager.getLoggedInUser() ?: ""
-    // Step 1: Get the currently selected currency.
     val selectedCurrency = sessionManager.getSelectedCurrency()
     val db = FirebaseFirestore.getInstance()
 
     var selectedFilter by remember { mutableStateOf("Monthly") }
-    // This state will now hold the category totals ALREADY CONVERTED to the selected currency.
+    // This state will hold the category totals ALREADY CONVERTED to the selected currency.
     var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
+
+    // NEW: State to hold the raw list of all expenses fetched by the real-time listener.
+    var allExpenses by remember { mutableStateOf<List<Expense>>(emptyList()) }
 
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    // Step 2: The LaunchedEffect now re-runs if the filter OR the currency changes.
-    LaunchedEffect(selectedFilter, selectedCurrency) {
-        if (username.isEmpty()) return@LaunchedEffect
-        Log.d(TAG, "LaunchedEffect triggered. Filter: $selectedFilter, Currency: $selectedCurrency")
+    // NEW: A DisposableEffect sets up a real-time listener for expenses.
+    // It runs when the screen is first composed and cleans up (removes the listener) when the screen is left.
+    // This ensures we always have the latest expense data without causing memory leaks.
+    // Ref: https://developer.android.com/jetpack/compose/side-effects#disposableeffect
+    DisposableEffect(username) {
+        if (username.isEmpty()) {
+            onDispose { } // Do nothing if there's no user.
+        }
+
+        Log.d(TAG, "Setting up real-time expense listener for user: $username")
+        // Ref: https://firebase.google.com/docs/firestore/query-data/listen
+        val listener = db.collection("users").document(username).collection("expenses")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Expense listener failed.", error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    // When new data arrives, map it to Expense objects and update our state.
+                    // Ref: https://firebase.google.com/docs/firestore/query-data/get-data#custom_objects
+                    allExpenses = snapshot.toObjects(Expense::class.java)
+                    Log.d(TAG, "Real-time expense data received. Count: ${allExpenses.size}")
+                }
+            }
+
+        // The onDispose block is crucial for cleanup.
+        onDispose {
+            Log.d(TAG, "Removing expense listener.")
+            listener.remove()
+        }
+    }
+
+    // MODIFIED: This LaunchedEffect now re-runs whenever the raw data (allExpenses) changes,
+    // or when the user changes the filter or currency. Its job is to process the data, not fetch it.
+    LaunchedEffect(allExpenses, selectedFilter, selectedCurrency) {
+        Log.d(TAG, "LaunchedEffect triggered for processing. Filter: $selectedFilter, Currency: $selectedCurrency, Expense Count: ${allExpenses.size}")
 
         val (start, end) = getDateRange(selectedFilter)
 
-        val expenses = db.collection("users").document(username)
-            .collection("expenses")
-            .get()
-            .await()
-            .mapNotNull { it.toObject(Expense::class.java) }
-            .filter {
-                val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
-                parsedDate != null && parsedDate in start..end
-            }
+        // Filter the live list of expenses based on the selected date range.
+        val expensesInPeriod = allExpenses.filter {
+            val parsedDate = try { formatter.parse(it.date) } catch (e: Exception) { null }
+            parsedDate != null && parsedDate in start..end
+        }
 
-        // First, group and sum the expenses in their base currency (ZAR).
-        val totalsInZAR = expenses.groupBy { it.category }
+        // First, group and sum the filtered expenses in their base currency (ZAR).
+        // Ref: https://kotlinlang.org/docs/collection-transformations.html
+        val totalsInZAR = expensesInPeriod.groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
 
-        // Step 3: Convert the ZAR totals to the selected currency before updating the state.
+        // Convert the ZAR totals to the selected currency before updating the state for display.
         categoryTotals = totalsInZAR.mapValues { (_, totalZAR) ->
             CurrencyConverter.convert(totalZAR, "ZAR", selectedCurrency)
         }
-        Log.d(TAG, "Converted category totals for display: $categoryTotals")
+        Log.d(TAG, "Processed and converted category totals for display: $categoryTotals")
     }
 
     Scaffold(
@@ -151,7 +193,7 @@ fun CategorySummaryScreen(navController: NavController) {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(category, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                            // Step 4: Display the dynamic currency symbol and the converted total.
+                            // Display the dynamic currency symbol and the converted total.
                             Text(
                                 text = "$selectedCurrency${"%.2f".format(total)}",
                                 fontSize = 18.sp,
