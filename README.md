@@ -116,7 +116,7 @@ Click here to view the full walkthrough video of PennyPal:
 1. Clone this repository
 
 ```bash
-git clone 
+git clone https://github.com/paayalrakesh/PennyPal.git
 ```
 
 2. Open in Android Studio (2024.2.2 Ladybug Feature Drop)
