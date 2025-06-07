@@ -2,7 +2,7 @@ name: Generated APK AAB (Upload - Create Artifact To Github Action)
 # Define environment variables used throughout the workflow
 env:
   main_project_module: app  # The name of the main module repository
-  playstore_name: Strategic-Savings  # The name of the Play Store app (only for naming artifacts)
+  playstore_name: PennyPal  # The name of the Play Store app (only for naming artifacts)
 on:
   # Run the workflow when a pull request is merged into the 'main' branch
   push:
