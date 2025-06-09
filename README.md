@@ -44,7 +44,6 @@ Click here to view the full walkthrough video of PennyPal:
 | **Budget Goals**              | Set monthly minimum and maximum spending goals, stored in Firebase               |
 | **Graph Analysis**            | View custom bar graph of spending per category with min/max goal overlays        |
 | **Goal Performance Feedback** | Visual progress bar showing budget goal adherence over time                      |
-| **Currency Support**          | Multi-currency feature with offline converter                                    |
 | **Error Handling**            | Input validation, user-friendly errors, and crash-free UI                        |
 
 ---
@@ -73,7 +72,7 @@ Click here to view the full walkthrough video of PennyPal:
 ## 📺 UI Design
 
 * Figma-based design
-* Yellow, blue and white pastel colour scheme
+* Yellow, green and white pastel colour scheme
 * Rounded cards, curved headers, clear typography
 * Fully responsive and accessibility-friendly
 * Custom bar graph with dynamic axis and goal overlays
@@ -91,14 +90,12 @@ Click here to view the full walkthrough video of PennyPal:
   * `categories`
   * `badges`
 * Real-time syncing and UI updates with `LaunchedEffect`
-* Offline-safe storage where applicable
 
 ---
 
 ## 🌟 Testing & GitHub Actions
 
 * GitHub Actions used for automated build validation
-* Unit tests on ViewModel logic (budget calculation, goal progress)
 * Firebase Firestore tested using mocked data in preview mode
 
 ---
@@ -107,7 +104,6 @@ Click here to view the full walkthrough video of PennyPal:
 
 * Built APK:
 * Works fully on real Android devices
-* No emulator required for showcase
 
 ---
 
@@ -127,14 +123,29 @@ git clone https://github.com/paayalrakesh/PennyPal.git
 
 ## 📸 Screenshots
 
-*Include screenshots of:*
+*Login and Sign up  
+<img src="https://github.com/user-attachments/assets/9f92d7cd-bdf8-4e1d-9063-361ea5a5ca50" width="300" />
+<img src="https://github.com/user-attachments/assets/bb324ba3-aee7-456b-b5cf-c1028c2737b8" width="300" />
 
-* HomeScreen
-<img src="https://github.com/user-attachments/assets/93a9e9ec-b401-4ad3-b788-bae5cb329ae4" width="300" />  
-* Category & Expense Entry
-* Graph with min/max overlays
-* Badge reward screen
-* Currency selection dropdown
+* HomeScreen  
+<img src="https://github.com/user-attachments/assets/93a9e9ec-b401-4ad3-b788-bae5cb329ae4" width="300" />
+
+* Category & Expense Entry  
+<img src="https://github.com/user-attachments/assets/f3d84330-2d31-427e-b725-9438af2feaf4" width="300" />
+<img src="https://github.com/user-attachments/assets/0157a8e9-0797-41db-b722-add6bea79570" width="300" />
+
+* Graph with min/max overlays  
+<img src="https://github.com/user-attachments/assets/dc4a6a45-768e-4c97-83df-76959db98ac9" width="300" />
+
+* Add Goals  
+<img src="https://github.com/user-attachments/assets/3849f8c1-e378-480f-bc0d-047945220d65" width="300" />
+
+* Badge reward screen  
+<img src="https://github.com/user-attachments/assets/ce513e1e-b521-417d-bf0f-4323ebb4d5d7" width="300" />
+
+* Currency selection dropdown  
+<img src="https://github.com/user-attachments/assets/80270469-fb06-4158-9678-83f670c8bc1f" width="300" />
+
 
 ---
 
@@ -146,7 +157,7 @@ Developed by: Paayal Rakesh and Keagan Charl Shaw
 
 ## 📃 Documentation
 
-* Research & design docs included in repo under `/docs`
+* Part 1 Design document included in repo under `/docs`
 * Code comments and logging provided throughout
 * View `/README.md` and `/.github/workflows/` for CI/CD
 
