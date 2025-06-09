@@ -67,6 +67,7 @@ import androidx.navigation.NavController
 import com.fake.pennypal.data.model.Expense
 import com.fake.pennypal.utils.CurrencyConverter
 import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.utils.getDateRange
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
@@ -92,7 +93,7 @@ fun CategorySummaryScreen(navController: NavController) {
 
     val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    // NEW: A DisposableEffect sets up a real-time listener for expenses.
+    // A DisposableEffect sets up a real-time listener for expenses.
     // It runs when the screen is first composed and cleans up (removes the listener) when the screen is left.
     // This ensures we always have the latest expense data without causing memory leaks.
     // Ref: https://developer.android.com/jetpack/compose/side-effects#disposableeffect
@@ -103,16 +104,17 @@ fun CategorySummaryScreen(navController: NavController) {
 
         Log.d(TAG, "Setting up real-time expense listener for user: $username")
         // Ref: https://firebase.google.com/docs/firestore/query-data/listen
+        // In CategorySummaryScreen's DisposableEffect
         val listener = db.collection("users").document(username).collection("expenses")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e(TAG, "Expense listener failed.", error)
-                    return@addSnapshotListener
-                }
+                // ...
                 if (snapshot != null) {
-                    // When new data arrives, map it to Expense objects and update our state.
-                    // Ref: https://firebase.google.com/docs/firestore/query-data/get-data#custom_objects
-                    allExpenses = snapshot.toObjects(Expense::class.java)
+                    // --- APPLY THE FIX HERE ---
+                    allExpenses = snapshot.documents.mapNotNull { document ->
+                        document.toObject(Expense::class.java)?.apply {
+                            this.documentId = document.id // Manually set the unique ID
+                        }
+                    }
                     Log.d(TAG, "Real-time expense data received. Count: ${allExpenses.size}")
                 }
             }
@@ -124,7 +126,7 @@ fun CategorySummaryScreen(navController: NavController) {
         }
     }
 
-    // MODIFIED: This LaunchedEffect now re-runs whenever the raw data (allExpenses) changes,
+    // This LaunchedEffect now re-runs whenever the raw data (allExpenses) changes,
     // or when the user changes the filter or currency. Its job is to process the data, not fetch it.
     LaunchedEffect(allExpenses, selectedFilter, selectedCurrency) {
         Log.d(TAG, "LaunchedEffect triggered for processing. Filter: $selectedFilter, Currency: $selectedCurrency, Expense Count: ${allExpenses.size}")

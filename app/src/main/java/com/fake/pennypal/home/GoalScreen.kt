@@ -230,20 +230,32 @@ fun GoalScreen(navController: NavController) {
                             try {
                                 // Step 4: Convert the user's input from the selected currency BACK to ZAR before saving.
                                 // This ensures data consistency in Firestore.
+                                // In GoalScreen.kt -> Button onClick -> scope.launch -> try block
+
+// after currency conversion ...
                                 val incomeToSaveZAR = CurrencyConverter.convert(incomeInput, selectedCurrency, "ZAR")
                                 val spendingToSaveZAR = CurrencyConverter.convert(spendingInput, selectedCurrency, "ZAR")
                                 val minSpendingToSaveZAR = minSpendingInput?.let { CurrencyConverter.convert(it, selectedCurrency, "ZAR") }
-                                Log.d(TAG, "Values converted to ZAR for saving: Income=$incomeToSaveZAR, Limit=$spendingToSaveZAR, Min=$minSpendingToSaveZAR")
 
-
-                                // Step 5: Save the ZAR values to Firestore.
+// LOGIC FOR SAVING DATA ---
                                 val data = mutableMapOf<String, Any>(
                                     "incomeGoal" to incomeToSaveZAR,
                                     "spendingLimit" to spendingToSaveZAR
                                 )
+
                                 if (minSpendingToSaveZAR != null) {
+                                    // If there's a value, add it to the map
                                     data["minSpendingGoal"] = minSpendingToSaveZAR
+                                } else {
+                                    // If there's NO value, explicitly tell Firestore to delete the field
+                                    data["minSpendingGoal"] = com.google.firebase.firestore.FieldValue.delete()
                                 }
+
+// Use .update() instead of .set() for more precise control with FieldValue.delete()
+                                db.collection("users").document(username)
+                                    .collection("goals").document("default")
+                                    .set(data, com.google.firebase.firestore.SetOptions.merge()) // Use set with merge to handle creation and updates
+                                    .await()
 
                                 db.collection("users").document(username).collection("goals").document("default").set(data).await()
 

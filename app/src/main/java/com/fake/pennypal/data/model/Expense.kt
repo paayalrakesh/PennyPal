@@ -1,10 +1,21 @@
 package com.fake.pennypal.data.model
 
-import androidx.annotation.Keep
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import com.google.firebase.firestore.Exclude // <-- Add this import
 
-@Keep
+@Entity(tableName = "expenses")
 data class Expense(
-    var id: String = "",
+    // This is the local ID for the Room database.
+    // We tell Firestore to completely ignore it.
+    @PrimaryKey(autoGenerate = true)
+    @get:Exclude
+    var id: Int = 0,
+
+    // This is the ID from the Firestore document.
+    var documentId: String = "",
+
+    // All your other fields remain the same
     var date: String = "",
     var amount: Double = 0.0,
     var category: String = "",

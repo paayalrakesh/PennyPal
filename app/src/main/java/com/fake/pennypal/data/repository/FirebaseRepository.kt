@@ -13,12 +13,13 @@ class FirebaseRepository {
 
     fun addIncome(income: Income) {
         val doc = db.collection("users").document(userId()).collection("income").document()
-        doc.set(income.copy(id = doc.id))
+
     }
 
     fun addExpense(expense: Expense) {
         val doc = db.collection("users").document(userId()).collection("expenses").document()
-        doc.set(expense.copy(id = doc.id))
+
+        doc.set(expense.copy(documentId = doc.id))
     }
 
     fun getIncome(onResult: (List<Income>) -> Unit) {

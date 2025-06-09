@@ -56,7 +56,6 @@ fun HomeScreen(navController: NavController) {
     var incomeList by remember { mutableStateOf(emptyList<Income>()) }
     var expenseList by remember { mutableStateOf(emptyList<Expense>()) }
 
-    // CHANGE: Switched from LaunchedEffect to DisposableEffect to handle real-time listeners.
     // This effect will run when the screen is first composed and will clean up when it's disposed.
     DisposableEffect(username) {
         if (username.isBlank()) {
@@ -80,16 +79,19 @@ fun HomeScreen(navController: NavController) {
             }
 
         // Listener for Expenses
+        // In HomeScreen's DisposableEffect
         val expenseListener = db.collection("users").document(username).collection("expenses")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e(TAG, "Expense listener failed.", error)
-                    return@addSnapshotListener
-                }
+                // ...
                 if (snapshot != null) {
-                    val expenses = snapshot.documents.mapNotNull { it.toObject(Expense::class.java) }
+                    // --- APPLY THE FIX HERE ---
+                    val expenses = snapshot.documents.mapNotNull { document ->
+                        document.toObject(Expense::class.java)?.apply {
+                            this.documentId = document.id // Manually set the unique ID
+                        }
+                    }
                     expenseList = expenses
-                    Log.d(TAG, "Expense data updated in real-time. Count: ${expenses.size}")
+                    // ...
                 }
             }
 

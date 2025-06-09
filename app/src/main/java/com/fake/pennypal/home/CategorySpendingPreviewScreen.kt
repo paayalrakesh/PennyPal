@@ -45,6 +45,7 @@ import com.fake.pennypal.data.model.Income
 import com.google.firebase.firestore.FirebaseFirestore
 import com.fake.pennypal.utils.getCurrentUsername
 import com.fake.pennypal.utils.SessionManager
+import com.fake.pennypal.utils.getDateRange
 import com.fake.pennypal.utils.CurrencyConverter
 import androidx.compose.foundation.Image
 import androidx.compose.ui.layout.ContentScale
@@ -122,9 +123,14 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         Log.d(TAG, "Setting up real-time listeners for user: $username")
         val expensesListener = db.collection("users").document(username).collection("expenses")
             .addSnapshotListener { snapshot, error ->
-                if (error != null) { Log.e(TAG, "Expense listener failed.", error); return@addSnapshotListener }
+                // ...
                 if (snapshot != null) {
-                    allExpenses = snapshot.documents.mapNotNull { it.toObject(Expense::class.java) }
+                    // --- APPLY THE FIX HERE ---
+                    allExpenses = snapshot.documents.mapNotNull { document ->
+                        document.toObject(Expense::class.java)?.apply {
+                            this.documentId = document.id // Manually set the unique ID
+                        }
+                    }
                 }
             }
 
@@ -179,7 +185,7 @@ fun CategorySpendingPreviewScreen(navController: NavController) {
         try {
             val goalsDoc = db.collection("users").document(username).collection("goals").document("default").get().await()
             val minGoalZAR = goalsDoc.getDouble("minSpendingGoal") ?: 0.0
-            val maxGoalZAR = goalsDoc.getDouble("spendingLimit") ?: 20000.0
+            val maxGoalZAR = goalsDoc.getDouble("spendingLimit") ?: 0.0
 
             // CHANGE: Update the state variables with the converted goal values
             minSpendingGoal = CurrencyConverter.convert(minGoalZAR, "ZAR", selectedCurrency)
@@ -343,52 +349,97 @@ fun BarChartWithGoals(
     maxGoal: Double,
     currency: String
 ) {
-    val maxAmount = (categoryTotals.values.maxOrNull() ?: 1.0).coerceAtLeast(maxGoal)
+    // Safely calculate maxAmount and prevent it from being zero
+    val maxAmount = (categoryTotals.values.maxOrNull() ?: 0.0)
+        .coerceAtLeast(maxGoal)
+        .coerceAtLeast(1.0) // Ensure the divisor is at least 1.0 to prevent division by zero
     val barColor = Color(0xFFAED581)
     val backgroundColor = Color(0xFFF3FCEB)
 
     Card(
-        modifier = Modifier.fillMaxWidth().height(260.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "Income & Expenses", fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = Color(0xFF2E7D32))
+            Text(
+                text = "Spending by Category", // Changed title for clarity
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                color = Color(0xFF2E7D32)
+            )
             Box(
-                modifier = Modifier.fillMaxWidth().height(160.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
             ) {
+                // Background grid lines
                 repeat(4) { i ->
                     val y = 40.dp * i
-                    Divider(color = Color.LightGray, thickness = 1.dp, modifier = Modifier.fillMaxWidth().align(Alignment.TopStart).offset(y = y))
+                    Divider(
+                        color = Color.LightGray.copy(alpha = 0.5f), // Made them fainter
+                        thickness = 1.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopStart)
+                            .offset(y = y)
+                    )
                 }
+
+                // Bars
                 Row(
-                    modifier = Modifier.fillMaxSize().padding(top = 12.dp, bottom = 8.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 12.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.Bottom
                 ) {
                     categoryTotals.entries.forEach { (category, amount) ->
-                        val heightRatio = (amount / maxAmount).coerceIn(0.0, 1.0)
+                        // Calculate height as a fraction of the total available height (140.dp)
+                        val heightRatio = (amount / maxAmount).toFloat().coerceIn(0.0f, 1.0f)
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Bottom,
                             modifier = Modifier.height(140.dp)
                         ) {
-                            Box(modifier = Modifier.width(16.dp).height((heightRatio * 100).dp).background(barColor, shape = RoundedCornerShape(8.dp)))
+                            Box(
+                                modifier = Modifier
+                                    .width(20.dp) // Made bars slightly wider
+                                    .fillMaxHeight(heightRatio) // Use fillMaxHeight for proportional scaling
+                                    .background(barColor, shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(category.take(3), fontSize = 10.sp, color = Color.DarkGray)
+                            Text(
+                                text = category.take(3).uppercase(), // Abbreviate category name
+                                fontSize = 10.sp,
+                                color = Color.DarkGray
+                            )
                         }
                     }
                 }
             }
+            // Goal labels
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Min: $currency ${"%.0f".format(minGoal)}", fontSize = 12.sp, color = Color(0xFF388E3C))
-                Text("Max: $currency ${"%.0f".format(maxGoal)}", fontSize = 12.sp, color = Color.Red)
+                Text(
+                    "Min: $currency ${"%.0f".format(minGoal)}",
+                    fontSize = 12.sp,
+                    color = Color(0xFF388E3C)
+                )
+                Text(
+                    "Max: $currency ${"%.0f".format(maxGoal)}",
+                    fontSize = 12.sp,
+                    color = Color.Red
+                )
             }
         }
     }
