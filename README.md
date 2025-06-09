@@ -24,7 +24,7 @@ This application was created as part of a practical coursework submission, demon
 
 ## 🎥 Demo Video
 
-Click here to view the full walkthrough video of PennyPal: 
+Click here to view the full walkthrough video of PennyPal: https://youtu.be/zwzYMGw49aE?si=Hvd8JXPLIY7DGq24
 
 * App demonstration on real Android phone
 * Voiceover explaining each screen
@@ -102,7 +102,7 @@ Click here to view the full walkthrough video of PennyPal:
 
 ## 🚀 Build & Deployment
 
-* Built APK:
+* Built APK: 
 * Works fully on real Android devices
 
 ---
@@ -157,7 +157,7 @@ Developed by: Paayal Rakesh and Keagan Charl Shaw
 
 ## 📃 Documentation
 
-* Part 1 Design document included in repo under `/docs`
+* Lecturer Feedback pdf included as well as Part 1 Research and Design documents in repo under. `/docs`
 * Code comments and logging provided throughout
 * View `/README.md` and `/.github/workflows/` for CI/CD
 
