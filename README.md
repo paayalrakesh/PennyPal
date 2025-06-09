@@ -130,6 +130,8 @@ git clone https://github.com/paayalrakesh/PennyPal.git
 *Include screenshots of:*
 
 * HomeScreen
+![Screenshot_20250609_134330_PennyPal](https://github.com/user-attachments/assets/93a9e9ec-b401-4ad3-b788-bae5cb329ae4)
+  
 * Category & Expense Entry
 * Graph with min/max overlays
 * Badge reward screen
