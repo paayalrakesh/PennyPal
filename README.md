@@ -102,7 +102,6 @@ Click here to view the full walkthrough video of PennyPal: https://youtu.be/zwzY
 
 ## 🚀 Build & Deployment
 
-* Built APK: 
 * Works fully on real Android devices
 
 ---
